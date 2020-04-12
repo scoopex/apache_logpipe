@@ -1,21 +1,18 @@
 package processing
 
-import "log"
-import "os"
+import (
+	"log"
+	"os"
 
-// https://godoc.org/github.com/golang/glog
-import "github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
+)
 
-
+// Debugit displays the give datastructure
 func Debugit(debug ...interface{}) {
-   scs := spew.ConfigState{
-      SortKeys: true,
-      Indent:   " ",
-   }
-   log.Println(scs.Sdump(debug))
-   os.Exit(1)
-}
-
-func Showstats(){
-   Debugit(stats)
+	scs := spew.ConfigState{
+		SortKeys: true,
+		Indent:   " ",
+	}
+	log.Println(scs.Sdump(debug))
+	os.Exit(1)
 }
