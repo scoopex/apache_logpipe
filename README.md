@@ -1,10 +1,6 @@
-
+https://medium.com/rate-engineering/go-test-your-code-an-introduction-to-effective-testing-in-go-6e4f66f2c259
 https://golang.org/dl/
 https://www.alexedwards.net/blog/an-overview-of-go-tooling
-
-sudo add-apt-repository ppa:longsleep/golang-backports
-sudo apt update
-sudo apt install golang-go
 
 go get github.com/pborman/getopt
 go get -d ./...

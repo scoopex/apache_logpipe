@@ -34,6 +34,8 @@ func parseInput(verbose bool) {
 	lines := 0
 	linesNotMatched := 0
 	timeStart := time.Now()
+	acc := processing.RequestAccounting
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		lines++
@@ -62,9 +64,9 @@ func parseInput(verbose bool) {
 		}
 		matchStatic := requestStaticRe.FindStringSubmatch(result["uri"])
 		if len(matchStatic) == 0 {
-			processing.AccountRequest(result["domain"], result["uri"], result["time"], code)
+			acc.AccountRequest(result["domain"], result["uri"], result["time"], code)
 		} else {
-			processing.AccountRequest(result["domain"], "NOT MATCHED", result["time"], code)
+			acc.AccountRequest(result["domain"], "NOT MATCHED", result["time"], code)
 		}
 	}
 
@@ -74,7 +76,7 @@ func parseInput(verbose bool) {
 	log.Printf("Processed %d lines in %s, %f lines per second, %d lines not matched (%0.2f%%)\n", lines, elapsed, linesPerSecond, linesNotMatched, percentageNotMatched)
 
 	if verbose == true {
-		processing.Showstats()
+		acc.Showstats()
 	}
 }
 

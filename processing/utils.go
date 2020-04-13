@@ -8,11 +8,13 @@ import (
 )
 
 // Debugit displays the give datastructure
-func Debugit(debug ...interface{}) {
+func Debugit(exit bool, debug ...interface{}) {
 	scs := spew.ConfigState{
 		SortKeys: true,
 		Indent:   " ",
 	}
-	log.Println(scs.Sdump(debug))
-	os.Exit(1)
+	log.Println(scs.Sdump(debug...))
+	if exit {
+		os.Exit(1)
+	}
 }
