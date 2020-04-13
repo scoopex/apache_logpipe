@@ -1,10 +1,10 @@
 package processing
 
 import (
-	"log"
 	"os"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/lestrrat-go/strftime"
 )
 
@@ -22,7 +22,7 @@ func fileExists(filename string) bool {
 		return false
 	}
 	if info.IsDir() {
-		log.Fatalf("%s is a directory", filename)
+		glog.Fatalf("%s is a directory", filename)
 	}
 	return true
 }
@@ -33,14 +33,14 @@ func getFileDescriptor() *os.File {
 		var err error
 		fileNamePatternStrftime, err = strftime.New(FilenamePattern)
 		if err != nil {
-			log.Fatal(err.Error())
+			glog.Fatal(err.Error())
 		}
 	}
 
 	currentFilename := fileNamePatternStrftime.FormatString(time.Now())
 	if currentFilename != fileName {
 
-		log.Printf("open file %s for writing", currentFilename)
+		glog.Infof("open file %s for writing", currentFilename)
 
 		var openFlags int
 		if fileExists(currentFilename) {
@@ -50,14 +50,14 @@ func getFileDescriptor() *os.File {
 		}
 		f, err := os.OpenFile(currentFilename, openFlags, 0644)
 		if err != nil {
-			log.Fatal(err.Error())
+			glog.Fatal(err.Error())
 			return nil
 		}
 		fileName = currentFilename
 		fileDescriptor.Close()
 		fileDescriptor = f
 	} else {
-		log.Println("Reuse filedescriptor")
+		glog.V(1).Info("Reuse filedescriptor")
 	}
 	return fileDescriptor
 }
@@ -69,7 +69,7 @@ func WriteLogLine(line string) {
 
 	_, err := fileDescriptor.WriteString(line + "\n")
 	if err != nil {
-		log.Println(err)
+		glog.Info(err)
 	}
 }
 

@@ -1,9 +1,10 @@
 package processing
 
 import (
-	"log"
 	"regexp"
 	"strconv"
+
+	"github.com/golang/glog"
 )
 
 // AccountingSet for a certain request type
@@ -44,7 +45,7 @@ func (c *Accounting) getPerfclasses(responsetime int) int {
 func (c *Accounting) AccountRequest(domain string, uri string, time string, code int) {
 	responsetime, err := strconv.Atoi(time)
 	if err != nil {
-		log.Fatalf("unable to convert time '%s' to a string", time)
+		glog.Fatalf("unable to convert time '%s' to a string", time)
 	}
 
 	for name, reName := range c.requestMappings {
