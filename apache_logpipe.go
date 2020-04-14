@@ -25,12 +25,12 @@ var lineRe = regexp.MustCompile(`^\d+\.\d+\.\d+\.\d+ (?P<domain>[^ ]+?)\s.*] "(G
 // regex insensitive static file ending
 var requestStaticRe = regexp.MustCompile(`(?i).+\.(gif|jpg|jpeg|png|ico|flv|swf|js|css|txt|woff|ttf)`)
 
-func parseInput(verbose bool) {
+func parseInput() {
 
 	scanner := bufio.NewScanner(os.Stdin)
 
-	lines := 0
-	linesNotMatched := 0
+	var lines int64 = 0
+	var linesNotMatched int64 = 0
 	timeStart := time.Now()
 	acc := processing.RequestAccounting
 
@@ -40,9 +40,7 @@ func parseInput(verbose bool) {
 		processing.WriteLogLine(line)
 		match := lineRe.FindStringSubmatch(line)
 		if len(match) == 0 {
-			if verbose == true {
-				glog.Infof("not matched line: %s\n", line)
-			}
+			glog.V(1).Infof("not matched line: %s\n", line)
 			linesNotMatched++
 			continue
 		}
@@ -62,25 +60,41 @@ func parseInput(verbose bool) {
 		}
 		matchStatic := requestStaticRe.FindStringSubmatch(result["uri"])
 		if len(matchStatic) == 0 {
-			acc.AccountRequest(result["domain"], result["uri"], result["time"], code)
+			processing.PerfSetChan <- processing.PerfSet{
+				Domain: result["domain"],
+				Ident:  result["uri"],
+				Time:   result["time"],
+				Code:   code,
+			}
 		} else {
-			acc.AccountRequest(result["domain"], "NOT MATCHED", result["time"], code)
+			processing.PerfSetChan <- processing.PerfSet{
+				Domain: result["domain"],
+				Ident:  "NOT MATCHED",
+				Time:   result["time"],
+				Code:   code,
+			}
 		}
+	}
+	processing.PerfSetChan <- processing.PerfSet{
+		Domain: "COMPLETE",
+		Ident:  "COMPLETE",
+		Time:   "0",
+		Code:   1,
+	}
+	linesAccounted := <-processing.CompleteChan
+	glog.V(1).Info("Accounted %i lines", linesAccounted)
+	if linesAccounted != lines-linesNotMatched {
+		glog.Error("accounted lines are not equal to matched lines")
 	}
 
 	elapsed := time.Since(timeStart)
 	linesPerSecond := float64(lines) / (float64(elapsed) / 1000000000)
 	percentageNotMatched := (float64(linesNotMatched) / float64(lines)) * 100
 	glog.Infof("Processed %d lines in %s, %f lines per second, %d lines not matched (%0.2f%%)\n", lines, elapsed, linesPerSecond, linesNotMatched, percentageNotMatched)
-
-	if verbose == true {
-		acc.Showstats()
-	}
+	acc.Showstats()
 }
 
 func main() {
-
-	verboseFlag := true
 	outputLogfile := flag.String("output_logfile", "/dev/null", "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
 	sendingInterval := flag.Int("sending_interval", 300, "Sending interval in seconds")
 	discoveryInterval := flag.Int("discovery_interval", 900, "Discovery interval in seconds")
@@ -92,5 +106,8 @@ func main() {
 	glog.Infof("Starting apache_logpipe: output_logfile: %s, sending_interval: %d, discovery_interval: %d, zabbix_server: %s, zabbix_host: %s\n",
 		*outputLogfile, *sendingInterval, *discoveryInterval, *zabbixServer, *zabbixHost)
 	processing.FilenamePattern = *outputLogfile
-	parseInput(verboseFlag)
+
+	// Asynchronous consumption of statistics
+	go processing.ConsumePerfSets()
+	parseInput()
 }

@@ -43,13 +43,13 @@ TODO:
 ----
 
 - Write unittests
-- Maintain a "current" link for the logfile
 - Add zabbix statistics submission
   (https://github.com/adubkov/go-zabbix)
 - Implement ansynchronous statistics calculation
 - Implement ansynchronous statistics submission to zabbix
 - Add a signal handler which closes logfile ad output statistics
 - Write documentation
+- Maintain a "current" link for the logfile
 - Add configuration file
 - Understand go dependency management
 

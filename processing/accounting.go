@@ -20,6 +20,13 @@ type Accounting struct {
 	stats           map[string]map[string]*AccountingSet
 }
 
+type PerfSet struct {
+	Domain string
+	Ident  string
+	Time   string
+	Code   int
+}
+
 // Config configures the accounting
 var RequestAccounting = Accounting{
 	// a list of accounting classes, defined in microseconds
@@ -32,13 +39,31 @@ var RequestAccounting = Accounting{
 	stats: map[string]map[string]*AccountingSet{},
 }
 
+var PerfSetChan = make(chan PerfSet, 100)
+var CompleteChan = make(chan int64)
+
 func (c *Accounting) getPerfclasses(responsetime int) int {
+
 	for _, perfclass := range c.classes {
 		if responsetime >= perfclass {
 			return perfclass
 		}
 	}
 	return 0
+}
+
+func ConsumePerfSets() {
+	var count int64 = 0
+	for {
+		glog.V(2).Info("Consume a PerfSet")
+		perfSet := <-PerfSetChan
+		if perfSet.Domain == "COMPLETE" {
+			CompleteChan <- count
+			return
+		}
+		RequestAccounting.AccountRequest(perfSet.Domain, perfSet.Ident, perfSet.Time, perfSet.Code)
+		count++
+	}
 }
 
 // AccountRequest accounts the request :-)
