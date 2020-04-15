@@ -57,7 +57,7 @@ func getFileDescriptor() *os.File {
 		fileDescriptor.Close()
 		fileDescriptor = f
 	} else {
-		glog.V(1).Info("Reuse filedescriptor")
+		glog.V(2).Info("Reuse filedescriptor")
 	}
 	return fileDescriptor
 }

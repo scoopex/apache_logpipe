@@ -3,6 +3,7 @@ package processing
 import (
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/golang/glog"
 )
@@ -52,17 +53,50 @@ func (c *Accounting) getPerfclasses(responsetime int) int {
 	return 0
 }
 
-func ConsumePerfSets() {
+func sendDiscovery() {
+	glog.Info("Sending discovery")
+}
+
+func sendData() {
+	glog.Info("Sending data")
+}
+
+// ConsumePerfSets from channel
+func ConsumePerfSets(discoveryIntervalSeconds int, sendingIntervalSeconds int, timeoutSeconds int) {
 	var count int64 = 0
+	var timeLastDiscovery time.Time = time.Now()
+	var timeLastStats time.Time = time.Now()
+
 	for {
-		glog.V(2).Info("Consume a PerfSet")
-		perfSet := <-PerfSetChan
-		if perfSet.Domain == "COMPLETE" {
-			CompleteChan <- count
-			return
+		elapsedSecondsDataDiscovery := int(time.Since(timeLastDiscovery) / 1000000000)
+		if elapsedSecondsDataDiscovery > discoveryIntervalSeconds {
+			sendDiscovery()
+			timeLastDiscovery = time.Now()
 		}
-		RequestAccounting.AccountRequest(perfSet.Domain, perfSet.Ident, perfSet.Time, perfSet.Code)
-		count++
+
+		elapsedSecondsDataStats := int(time.Since(timeLastStats) / 1000000000)
+		if elapsedSecondsDataStats > sendingIntervalSeconds {
+			sendData()
+			timeLastStats = time.Now()
+		}
+
+		select {
+		case perfSet := <-PerfSetChan:
+			{
+				if perfSet.Domain == "COMPLETE" {
+					glog.Info("Processing complete")
+					CompleteChan <- count
+					return
+				}
+				glog.V(2).Info("Consume a PerfSet")
+				RequestAccounting.AccountRequest(perfSet.Domain, perfSet.Ident, perfSet.Time, perfSet.Code)
+				count++
+			}
+		case <-time.After(time.Duration(timeoutSeconds) * time.Second):
+			{
+				glog.Infof("Timeout after %d seconds", timeoutSeconds)
+			}
+		}
 	}
 }
 
