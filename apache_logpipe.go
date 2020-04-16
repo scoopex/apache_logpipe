@@ -5,8 +5,10 @@ import (
 	"bufio"
 	"flag"
 	"os"
+	"os/signal"
 	"regexp"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -76,12 +78,14 @@ func parseInput() {
 			}
 		}
 	}
+
 	processing.PerfSetChan <- processing.PerfSet{
 		Domain: "COMPLETE",
 		Ident:  "COMPLETE",
 		Time:   "0",
 		Code:   1,
 	}
+
 	linesAccounted := <-processing.CompleteChan
 	glog.V(1).Infof("Accounted %d lines", linesAccounted)
 	if linesAccounted != lines-linesNotMatched {
@@ -99,7 +103,7 @@ func parseInput() {
 func main() {
 	outputLogfile := flag.String("output_logfile", "/dev/null", "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
 	sendingInterval := flag.Int("sending_interval", 300, "Sending interval in seconds")
-	timeout := flag.Int("timeout", 1, "timeout in seconds")
+	timeout := flag.Int("timeout", 5, "timeout in seconds")
 	discoveryInterval := flag.Int("discovery_interval", 900, "Discovery interval in seconds")
 	zabbixServer := flag.String("zabbix_server", "127.0.0.1", "The zabbix server")
 	zabbixHost := flag.String("zabbix_host", "127.0.0.1", "The zabbix host")
@@ -109,6 +113,9 @@ func main() {
 	glog.Infof("Starting apache_logpipe: output_logfile: %s, sending_interval: %d, discovery_interval: %d, zabbix_server: %s, zabbix_host: %s\n",
 		*outputLogfile, *sendingInterval, *discoveryInterval, *zabbixServer, *zabbixHost)
 	processing.FilenamePattern = *outputLogfile
+
+	// Install signal handler
+	signal.Notify(processing.SignalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// Asynchronous consumption of statistics
 	go processing.ConsumePerfSets(*discoveryInterval, *sendingInterval, *timeout)

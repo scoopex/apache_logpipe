@@ -1,11 +1,17 @@
 package processing
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
+	. "github.com/blacked/go-zabbix"
 	"github.com/golang/glog"
+	"github.com/ulule/deepcopier"
 )
 
 // AccountingSet for a certain request type
@@ -19,6 +25,7 @@ type Accounting struct {
 	classes         []int
 	requestMappings map[string]*regexp.Regexp
 	stats           map[string]map[string]*AccountingSet
+	lastStats       map[string]map[string]*AccountingSet
 }
 
 type PerfSet struct {
@@ -28,7 +35,7 @@ type PerfSet struct {
 	Code   int
 }
 
-// Config configures the accounting
+// RequestAccounting configures the accounting
 var RequestAccounting = Accounting{
 	// a list of accounting classes, defined in microseconds
 	classes: []int{0, 500000, 10000000, 5000000, 60000000, 300000000},
@@ -37,11 +44,13 @@ var RequestAccounting = Accounting{
 		"all": regexp.MustCompile(`([^?]*)\??.*`),
 	},
 	// the current state of the statistics
-	stats: map[string]map[string]*AccountingSet{},
+	stats:     map[string]map[string]*AccountingSet{},
+	lastStats: map[string]map[string]*AccountingSet{},
 }
 
 var PerfSetChan = make(chan PerfSet, 100)
 var CompleteChan = make(chan int64)
+var SignalChan = make(chan os.Signal, 1)
 
 func (c *Accounting) getPerfclasses(responsetime int) int {
 
@@ -53,12 +62,101 @@ func (c *Accounting) getPerfclasses(responsetime int) int {
 	return 0
 }
 
-func sendDiscovery() {
-	glog.Info("Sending discovery")
+type ZabbixConfigSetting struct {
+	Server       string
+	ServerPort   int
+	Host         string
+	DiscoveryKey string
+	BaseKey      string
 }
 
-func sendData() {
+var ZabbixSender = ZabbixConfigSetting{
+	Server:       "zabbix",
+	ServerPort:   10050,
+	Host:         GetHostname(),
+	DiscoveryKey: "apache.discovery",
+	BaseKey:      "apache.acc",
+}
+
+func (c *Accounting) sendDiscovery() {
+	glog.Info("Sending discovery")
+
+	var discoveryDataArray []map[string]string
+
+	for vhost, vhostData := range c.stats {
+		for accset := range vhostData {
+			discoveryItem := map[string]string{
+				"{#NAME}":   vhost,
+				"{#ACCSET}": accset,
+			}
+			discoveryDataArray = append(discoveryDataArray, discoveryItem)
+		}
+	}
+	jsonString, err := json.Marshal(discoveryDataArray)
+	if err != nil {
+		glog.Fatalf("unable to marshal json discovery data: %s", err.Error())
+	}
+	glog.Infof("sending discovery data >>>%s<<<", string(jsonString))
+	var metrics []*Metric
+	metrics = append(metrics, NewMetric(ZabbixSender.Host, ZabbixSender.DiscoveryKey, string(jsonString), time.Now().Unix()))
+	packet := NewPacket(metrics)
+	z := NewSender(ZabbixSender.Server, ZabbixSender.ServerPort)
+	res, err := z.Send(packet)
+	if err != nil {
+		glog.Errorf("unable to send discovery key : '%s' - >>>%s<<<", err.Error(), res)
+	}
+}
+
+func createZabbixMetric(dataTime int64, value string, keys ...string) *Metric {
+	key := fmt.Sprintf("%s[%s]", ZabbixSender.BaseKey, strings.Join(keys, ","))
+	glog.V(1).Infof("Creating metric : %s = %s", key, value)
+	return NewMetric(ZabbixSender.Host, key, string(value), dataTime)
+}
+
+func (c *Accounting) sendData() {
 	glog.Info("Sending data")
+	var metrics []*Metric
+
+	dataTime := time.Now().Unix()
+
+	for vhost, vhostData := range c.stats {
+		for accset, accsetData := range vhostData {
+			metrics = append(metrics, createZabbixMetric(dataTime, strconv.FormatInt(accsetData.count, 10), vhost, accset, "count"))
+			metrics = append(metrics, createZabbixMetric(dataTime, strconv.FormatInt(accsetData.sum, 10), vhost, accset, "sum"))
+
+			// Clalculate differential statistics
+			_, ok := c.lastStats[vhost][accset]
+			if ok {
+				requestsProcessed := accsetData.count - c.lastStats[vhost][accset].count
+				timeTaken := accsetData.sum - c.lastStats[vhost][accset].sum
+				glog.Info(accsetData.count, c.lastStats[vhost][accset].count)
+
+				var requestsPerSecond string = "0"
+				if requestsProcessed > 0 {
+					requestsPerSecond = fmt.Sprintf("%f", float64(timeTaken/requestsProcessed))
+				}
+				metrics = append(metrics, createZabbixMetric(dataTime, requestsPerSecond, vhost, accset, "req_s"))
+			}
+		}
+	}
+
+	Debugit(false, "current", c.stats)
+	Debugit(false, "last", c.lastStats)
+
+	packet := NewPacket(metrics)
+
+	z := NewSender(ZabbixSender.Server, ZabbixSender.ServerPort)
+	res, err := z.Send(packet)
+	if err != nil {
+		glog.Errorf("unable to send discovery key : '%s' - >>>%s<<<", err.Error(), res)
+	}
+
+	// clone the structure
+	c.lastStats = map[string]map[string]*AccountingSet{}
+	err = deepcopier.Copy(c.stats).To(c.lastStats)
+	if err != nil {
+		glog.Errorf("unable to clone : '%s'", err.Error())
+	}
 }
 
 // ConsumePerfSets from channel
@@ -68,23 +166,21 @@ func ConsumePerfSets(discoveryIntervalSeconds int, sendingIntervalSeconds int, t
 	var timeLastStats time.Time = time.Now()
 
 	for {
-		elapsedSecondsDataDiscovery := int(time.Since(timeLastDiscovery) / 1000000000)
-		if elapsedSecondsDataDiscovery > discoveryIntervalSeconds {
-			sendDiscovery()
-			timeLastDiscovery = time.Now()
-		}
-
-		elapsedSecondsDataStats := int(time.Since(timeLastStats) / 1000000000)
-		if elapsedSecondsDataStats > sendingIntervalSeconds {
-			sendData()
-			timeLastStats = time.Now()
-		}
-
 		select {
+		case signal := <-SignalChan:
+			{
+				glog.Infof("got %s signal, terminating myself now", signal)
+				RequestAccounting.Showstats()
+				RequestAccounting.sendDiscovery()
+				RequestAccounting.sendData()
+				os.Exit(1)
+			}
 		case perfSet := <-PerfSetChan:
 			{
 				if perfSet.Domain == "COMPLETE" {
 					glog.Info("Processing complete")
+					RequestAccounting.sendDiscovery()
+					RequestAccounting.sendData()
 					CompleteChan <- count
 					return
 				}
@@ -94,9 +190,22 @@ func ConsumePerfSets(discoveryIntervalSeconds int, sendingIntervalSeconds int, t
 			}
 		case <-time.After(time.Duration(timeoutSeconds) * time.Second):
 			{
-				glog.Infof("Timeout after %d seconds", timeoutSeconds)
+				glog.V(2).Infof("Timeout after %d seconds", timeoutSeconds)
 			}
 		}
+
+		elapsedSecondsDataDiscovery := int(time.Since(timeLastDiscovery) / 1000000000)
+		if elapsedSecondsDataDiscovery > discoveryIntervalSeconds {
+			RequestAccounting.sendDiscovery()
+			timeLastDiscovery = time.Now()
+		}
+
+		elapsedSecondsDataStats := int(time.Since(timeLastStats) / 1000000000)
+		if elapsedSecondsDataStats > sendingIntervalSeconds {
+			RequestAccounting.sendData()
+			timeLastStats = time.Now()
+		}
+
 	}
 }
 
@@ -134,5 +243,6 @@ func (c *Accounting) AccountRequest(domain string, uri string, time string, code
 
 // Showstats displays the statistics
 func (c *Accounting) Showstats() {
-	Debugit(false, c.stats)
+	Debugit(false, "current statistics", c.stats)
+	Debugit(false, "last statistics", c.lastStats)
 }
