@@ -4,11 +4,11 @@ apache_logpipe
 About this project
 ------------------
 
-**Don't laught about this code :-) This project is only a training project that I use to build up a luttle bit knowledge in the programming language GO.**
-Therefore it is a wise idea not to use this in production :-)
+**Don't laught about this code :-) This project is only a training project that I use to build up a little bit knowledge in the programming language GO.**
+Therefore it is a wise decision not to use this in production :-)
 A lot of things are currently probably terribly awkward for GO professionals and implemented in a non-idiomatic way.
 
-I have not spent very much time in reading books or documentations about this programming language, 
+I currently have not spent very much time in reading books or documentations about this programming language, 
 but I plan to do so in the next weeks. Then my code will probably improve ;-)
 
 **Feedback is very welcome :-)**
@@ -39,24 +39,25 @@ https://golang.org/dl/
 https://www.alexedwards.net/blog/an-overview-of-go-tooling
 
 
-TODO:
-----
+TODOs and Ideas:
+----------------
 
-- Refactor to more object oriented code
+- Refactor to more object oriented and unaderstandable code
+- Make the code more modular/structured 
 - Write unittests
-- Add zabbix statistics submission
-  (https://github.com/adubkov/go-zabbix)
-- Implement ansynchronous statistics calculation
-- Implement ansynchronous statistics submission to zabbix
-- Add a signal handler which closes logfile ad output statistics
 - Write documentation
 - Maintain a "current" link for the logfile
 - Add configuration file
+- Add a simple webserver which provides a statistics overview 
 - Understand go dependency management
 
 DONE:
 -----
 
+- Add a signal handler which closes logfile and output statistics
+- Implement ansynchronous statistics calculation
+- Implement ansynchronous statistics submission to zabbix
+- Implement zabbix discovery
 - Add a logging framework
   https://godoc.org/github.com/golang/glog
   https://gobyexample.com/command-line-flags
