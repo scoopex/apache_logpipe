@@ -27,7 +27,7 @@ var lineRe = regexp.MustCompile(`^\d+\.\d+\.\d+\.\d+ (?P<domain>[^ ]+?)\s.*] "(G
 // regex insensitive static file ending
 var requestStaticRe = regexp.MustCompile(`(?i).+\.(gif|jpg|jpeg|png|ico|flv|swf|js|css|txt|woff|ttf)`)
 
-func parseInput() {
+func parseInput(logSink processing.LogSink) {
 
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -39,7 +39,7 @@ func parseInput() {
 	for scanner.Scan() {
 		line := scanner.Text()
 		lines++
-		processing.WriteLogLine(line)
+		logSink.WriteLogLine(line)
 		match := lineRe.FindStringSubmatch(line)
 		if len(match) == 0 {
 			glog.V(1).Infof("not matched line: %s\n", line)
@@ -102,6 +102,7 @@ func parseInput() {
 
 func main() {
 	outputLogfile := flag.String("output_logfile", "/dev/null", "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
+	outputLogfileSymlink := flag.String("symlink", "", "A symlink which points to the current logfile")
 	sendingInterval := flag.Int("sending_interval", 300, "Sending interval in seconds")
 	timeout := flag.Int("timeout", 5, "timeout in seconds")
 	discoveryInterval := flag.Int("discovery_interval", 900, "Discovery interval in seconds")
@@ -113,13 +114,14 @@ func main() {
 
 	glog.Infof("Starting apache_logpipe: output_logfile: %s, sending_interval: %d, discovery_interval: %d, zabbix_server: %s, zabbix_host: %s\n",
 		*outputLogfile, *sendingInterval, *discoveryInterval, *zabbixServer, *zabbixHost)
-	processing.FilenamePattern = *outputLogfile
+
 	processing.ZabbixSenderDisabled = *zabbixSendDisabled
 
 	// Install signal handler
 	signal.Notify(processing.SignalChan, syscall.SIGINT, syscall.SIGTERM)
 
+	logSink := *processing.NewLogSink(*outputLogfile, *outputLogfileSymlink)
 	// Asynchronous consumption of statistics
 	go processing.ConsumePerfSets(*discoveryInterval, *sendingInterval, *timeout)
-	parseInput()
+	parseInput(logSink)
 }

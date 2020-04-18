@@ -1,6 +1,7 @@
 package processing
 
 import (
+	"flag"
 	"os"
 	"runtime"
 
@@ -27,4 +28,20 @@ func GetHostname() string {
 		panic(err)
 	}
 	return name
+}
+
+// SetupGlogForTests perform initalization of test logging
+func SetupGlogForTests() {
+	flag.Set("logtostderr", "true")
+	var logLevel string
+	flag.StringVar(&logLevel, "logLevel", "4", "test")
+	flag.Lookup("v").Value.Set(logLevel)
+}
+
+// FileExists checks fopr file if it exists
+func FileExists(filename string) bool {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }

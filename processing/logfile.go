@@ -2,88 +2,129 @@ package processing
 
 import (
 	"os"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/lestrrat-go/strftime"
 )
 
-// https://www.joeshaw.org/dont-defer-close-on-writable-files/
-
-// FilenamePattern defines a pattern for the logfile using date patterns
-var FilenamePattern string = ""
-var fileNamePatternStrftime *strftime.Strftime = nil
-var fileName string = ""
-var fileDescriptor *os.File
-
-func fileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	if info.IsDir() {
-		glog.Fatalf("%s is a directory", filename)
-	}
-	return true
+// LogSink instance manages
+type LogSink struct {
+	FilenamePattern         string
+	SymlinkFile             string
+	fileNamePatternStrftime *strftime.Strftime
+	CurrentFileName         string
+	fileDescriptor          *os.File
+	LinesWritten            int64
 }
 
-func getFileDescriptor() *os.File {
+var singletonLogSink *LogSink = nil
+var mu sync.Mutex
+var countChan = make(chan int64, 100)
 
-	if fileNamePatternStrftime == nil {
+// NewLogSink a new Logfile instance
+func NewLogSink(pattern string, symlink string) *LogSink {
+
+	// establish a lock and release lock after completing this function
+	// encapsulate lock in nameless function to prevent deadlog
+	// inspired by http://marcio.io/2015/07/singleton-pattern-in-go/
+	func() {
+		mu.Lock()
+		defer mu.Unlock()
+		if singletonLogSink == nil {
+			singletonLogSink = new(LogSink)
+		}
+		singletonLogSink.FilenamePattern = pattern
+		singletonLogSink.SymlinkFile = symlink
+	}()
+	singletonLogSink.fileDescriptor = singletonLogSink.getFileDescriptor()
+
+	return singletonLogSink
+}
+
+func (c *LogSink) getFileDescriptor() *os.File {
+
+	if c.fileNamePatternStrftime == nil {
 		var err error
-		fileNamePatternStrftime, err = strftime.New(FilenamePattern)
+		c.fileNamePatternStrftime, err = strftime.New(c.FilenamePattern)
 		if err != nil {
 			glog.Fatal(err.Error())
 		}
 	}
-
-	currentFilename := fileNamePatternStrftime.FormatString(time.Now())
-	if currentFilename != fileName {
-
-		glog.Infof("open file %s for writing", currentFilename)
-
+	currentFilename := c.fileNamePatternStrftime.FormatString(time.Now())
+	if currentFilename != c.CurrentFileName {
 		var openFlags int
-		if fileExists(currentFilename) {
+		if FileExists(currentFilename) {
+			glog.Infof("open existing file %s for writing", currentFilename)
 			openFlags = os.O_APPEND | os.O_WRONLY
 		} else {
+			glog.Infof("open new file %s for writing", currentFilename)
 			openFlags = os.O_CREATE | os.O_WRONLY
 		}
+
+		// establish a lock and release lock after completing this function
+		mu.Lock()
+		defer mu.Unlock()
+
 		f, err := os.OpenFile(currentFilename, openFlags, 0644)
 		if err != nil {
 			glog.Fatal(err.Error())
 			return nil
 		}
-		fileName = currentFilename
-		fileDescriptor.Close()
-		fileDescriptor = f
+		if c.SymlinkFile != "" {
+			if FileExists(c.SymlinkFile) {
+				glog.V(1).Infof("already exists, removing existing symlink %s", c.SymlinkFile)
+				os.Remove(c.SymlinkFile)
+			}
+			glog.V(2).Infof("creating symlink %s -> %s", currentFilename, c.SymlinkFile)
+			err = os.Symlink(currentFilename, c.SymlinkFile)
+			if err != nil {
+				glog.Fatal(err.Error())
+				return nil
+			}
+		}
+
+		c.CurrentFileName = currentFilename
+		c.fileDescriptor.Close()
+		c.fileDescriptor = f
 	} else {
 		glog.V(2).Info("Reuse filedescriptor")
 	}
-	return fileDescriptor
+	return c.fileDescriptor
 }
 
 // WriteLogLine writes a line to a logfile
-func WriteLogLine(line string) {
+func (c *LogSink) WriteLogLine(line string) {
 
-	if FilenamePattern == "/dev/null" {
+	if c.FilenamePattern == "/dev/null" {
 		return
 	}
-	fileDescriptor = getFileDescriptor()
+	c.fileDescriptor = c.getFileDescriptor()
 
-	_, err := fileDescriptor.WriteString(line + "\n")
+	_, err := c.fileDescriptor.WriteString(line + "\n")
 	if err != nil {
-		glog.Info(err)
+		glog.Fatal(err)
 	}
+	atomic.AddInt64(&c.LinesWritten, 1)
 }
 
 // CloseLogfile closes the logfile :-)
-func CloseLogfile() {
-	if FilenamePattern == "/dev/null" {
-		return
+func (c *LogSink) CloseLogfile() error {
+	if c.FilenamePattern == "/dev/null" {
+		return nil
 	}
-	if fileDescriptor != nil {
-		fileDescriptor.Close()
-		fileDescriptor = nil
-		fileName = ""
+	// establish a lock and release lock after completing this function
+	mu.Lock()
+	defer mu.Unlock()
+
+	glog.V(1).Infof("closing logfile %s", c.CurrentFileName)
+	var err error
+	c.CurrentFileName = ""
+	if c.fileDescriptor != nil {
+		err = c.fileDescriptor.Close()
+		c.fileDescriptor = nil
 	}
+	return err
 }
