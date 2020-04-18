@@ -107,12 +107,14 @@ func main() {
 	discoveryInterval := flag.Int("discovery_interval", 900, "Discovery interval in seconds")
 	zabbixServer := flag.String("zabbix_server", "127.0.0.1", "The zabbix server")
 	zabbixHost := flag.String("zabbix_host", "127.0.0.1", "The zabbix host")
+	zabbixSendDisabled := flag.Bool("disable_zabbix", false, "Disable zabbix sender")
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
 	glog.Infof("Starting apache_logpipe: output_logfile: %s, sending_interval: %d, discovery_interval: %d, zabbix_server: %s, zabbix_host: %s\n",
 		*outputLogfile, *sendingInterval, *discoveryInterval, *zabbixServer, *zabbixHost)
 	processing.FilenamePattern = *outputLogfile
+	processing.ZabbixSenderDisabled = *zabbixSendDisabled
 
 	// Install signal handler
 	signal.Notify(processing.SignalChan, syscall.SIGINT, syscall.SIGTERM)

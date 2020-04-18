@@ -65,6 +65,9 @@ func getFileDescriptor() *os.File {
 // WriteLogLine writes a line to a logfile
 func WriteLogLine(line string) {
 
+	if FilenamePattern == "/dev/null" {
+		return
+	}
 	fileDescriptor = getFileDescriptor()
 
 	_, err := fileDescriptor.WriteString(line + "\n")
@@ -75,6 +78,9 @@ func WriteLogLine(line string) {
 
 // CloseLogfile closes the logfile :-)
 func CloseLogfile() {
+	if FilenamePattern == "/dev/null" {
+		return
+	}
 	if fileDescriptor != nil {
 		fileDescriptor.Close()
 		fileDescriptor = nil

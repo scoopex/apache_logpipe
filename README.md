@@ -42,6 +42,7 @@ https://www.alexedwards.net/blog/an-overview-of-go-tooling
 TODO:
 ----
 
+- Refactor to more object oriented code
 - Write unittests
 - Add zabbix statistics submission
   (https://github.com/adubkov/go-zabbix)

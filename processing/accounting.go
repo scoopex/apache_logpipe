@@ -11,15 +11,16 @@ import (
 
 	. "github.com/blacked/go-zabbix"
 	"github.com/golang/glog"
-	"github.com/ulule/deepcopier"
 )
 
 // AccountingSet for a certain request type
 type AccountingSet struct {
-	count   int64
-	sum     int64
-	codes   map[int]int
-	classes map[int]int
+	count     int64
+	lastCount int64
+	sum       int64
+	lastSum   int64
+	codes     map[int]int64
+	classes   map[int]int64
 }
 type Accounting struct {
 	classes         []int
@@ -78,6 +79,8 @@ var ZabbixSender = ZabbixConfigSetting{
 	BaseKey:      "apache.acc",
 }
 
+var ZabbixSenderDisabled bool = false
+
 func (c *Accounting) sendDiscovery() {
 	glog.Info("Sending discovery")
 
@@ -99,11 +102,20 @@ func (c *Accounting) sendDiscovery() {
 	glog.Infof("sending discovery data >>>%s<<<", string(jsonString))
 	var metrics []*Metric
 	metrics = append(metrics, NewMetric(ZabbixSender.Host, ZabbixSender.DiscoveryKey, string(jsonString), time.Now().Unix()))
-	packet := NewPacket(metrics)
-	z := NewSender(ZabbixSender.Server, ZabbixSender.ServerPort)
-	res, err := z.Send(packet)
-	if err != nil {
-		glog.Errorf("unable to send discovery key : '%s' - >>>%s<<<", err.Error(), res)
+	sendZabbixMetrics(metrics)
+}
+
+func sendZabbixMetrics(metrics []*Metric) {
+
+	if ZabbixSenderDisabled {
+		glog.Info("Zabbix sender disabled, not sending data")
+	} else {
+		packet := NewPacket(metrics)
+		z := NewSender(ZabbixSender.Server, ZabbixSender.ServerPort)
+		res, err := z.Send(packet)
+		if err != nil {
+			glog.Errorf("unable to send discovery key : '%s' - >>>%s<<<", err.Error(), res)
+		}
 	}
 }
 
@@ -124,39 +136,29 @@ func (c *Accounting) sendData() {
 			metrics = append(metrics, createZabbixMetric(dataTime, strconv.FormatInt(accsetData.count, 10), vhost, accset, "count"))
 			metrics = append(metrics, createZabbixMetric(dataTime, strconv.FormatInt(accsetData.sum, 10), vhost, accset, "sum"))
 
-			// Clalculate differential statistics
-			_, ok := c.lastStats[vhost][accset]
-			if ok {
-				requestsProcessed := accsetData.count - c.lastStats[vhost][accset].count
-				timeTaken := accsetData.sum - c.lastStats[vhost][accset].sum
-				glog.Info(accsetData.count, c.lastStats[vhost][accset].count)
+			/*
+			 * Calculate differential statistics
+			 */
+			requestsProcessed := accsetData.count - accsetData.lastCount
+			timeTaken := accsetData.sum - accsetData.lastSum
+			var requestsPerSecond string = "0"
+			if requestsProcessed > 0 {
+				requestsPerSecond = fmt.Sprintf("%f", float64(timeTaken/requestsProcessed))
+			}
+			accsetData.lastCount = accsetData.count
+			accsetData.lastSum = accsetData.sum
+			metrics = append(metrics, createZabbixMetric(dataTime, requestsPerSecond, vhost, accset, "req_s"))
 
-				var requestsPerSecond string = "0"
-				if requestsProcessed > 0 {
-					requestsPerSecond = fmt.Sprintf("%f", float64(timeTaken/requestsProcessed))
-				}
-				metrics = append(metrics, createZabbixMetric(dataTime, requestsPerSecond, vhost, accset, "req_s"))
+			for class, count := range accsetData.classes {
+				metrics = append(metrics, createZabbixMetric(dataTime, strconv.FormatInt(count, 10), vhost, accset, "class", fmt.Sprintf("%d", class)))
+			}
+
+			for code, count := range accsetData.codes {
+				metrics = append(metrics, createZabbixMetric(dataTime, strconv.FormatInt(count, 10), vhost, accset, "code", fmt.Sprintf("%d", code)))
 			}
 		}
 	}
-
-	Debugit(false, "current", c.stats)
-	Debugit(false, "last", c.lastStats)
-
-	packet := NewPacket(metrics)
-
-	z := NewSender(ZabbixSender.Server, ZabbixSender.ServerPort)
-	res, err := z.Send(packet)
-	if err != nil {
-		glog.Errorf("unable to send discovery key : '%s' - >>>%s<<<", err.Error(), res)
-	}
-
-	// clone the structure
-	c.lastStats = map[string]map[string]*AccountingSet{}
-	err = deepcopier.Copy(c.stats).To(c.lastStats)
-	if err != nil {
-		glog.Errorf("unable to clone : '%s'", err.Error())
-	}
+	sendZabbixMetrics(metrics)
 }
 
 // ConsumePerfSets from channel
@@ -226,8 +228,8 @@ func (c *Accounting) AccountRequest(domain string, uri string, time string, code
 			c.stats[domain][name] = &AccountingSet{
 				count:   0,
 				sum:     0,
-				codes:   make(map[int]int),
-				classes: make(map[int]int),
+				codes:   make(map[int]int64),
+				classes: make(map[int]int64),
 			}
 			for _, perfclass := range c.classes {
 				c.stats[domain][name].classes[perfclass] = 0
