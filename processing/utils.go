@@ -22,6 +22,7 @@ func Debugit(exit bool, note string, debug ...interface{}) {
 	}
 }
 
+// GetHostname returns the hostname of the system
 func GetHostname() string {
 	name, err := os.Hostname()
 	if err != nil {

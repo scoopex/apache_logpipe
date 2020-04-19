@@ -27,14 +27,13 @@ var lineRe = regexp.MustCompile(`^\d+\.\d+\.\d+\.\d+ (?P<domain>[^ ]+?)\s.*] "(G
 // regex insensitive static file ending
 var requestStaticRe = regexp.MustCompile(`(?i).+\.(gif|jpg|jpeg|png|ico|flv|swf|js|css|txt|woff|ttf)`)
 
-func parseInput(logSink processing.LogSink) {
+func parseInput(logSink processing.LogSink, requestAccounting processing.RequestAccounting) {
 
 	scanner := bufio.NewScanner(os.Stdin)
 
 	var lines int64 = 0
 	var linesNotMatched int64 = 0
 	timeStart := time.Now()
-	acc := processing.RequestAccounting
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -97,7 +96,7 @@ func parseInput(logSink processing.LogSink) {
 	linesPerSecond := float64(lines) / (float64(elapsed) / 1000000000)
 	percentageNotMatched := (float64(linesNotMatched) / float64(lines)) * 100
 	glog.Infof("Processed %d lines in %s, %f lines per second, %d lines not matched (%0.2f%%)\n", lines, elapsed, linesPerSecond, linesNotMatched, percentageNotMatched)
-	acc.Showstats()
+	requestAccounting.Showstats()
 }
 
 func main() {
@@ -115,13 +114,14 @@ func main() {
 	glog.Infof("Starting apache_logpipe: output_logfile: %s, sending_interval: %d, discovery_interval: %d, zabbix_server: %s, zabbix_host: %s\n",
 		*outputLogfile, *sendingInterval, *discoveryInterval, *zabbixServer, *zabbixHost)
 
-	processing.ZabbixSenderDisabled = *zabbixSendDisabled
-
 	// Install signal handler
 	signal.Notify(processing.SignalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	logSink := *processing.NewLogSink(*outputLogfile, *outputLogfileSymlink)
+
+	requestAccounting := processing.NewRequestAccounting()
+	requestAccounting.DisableZabbixSender(*zabbixSendDisabled)
 	// Asynchronous consumption of statistics
-	go processing.ConsumePerfSets(*discoveryInterval, *sendingInterval, *timeout)
-	parseInput(logSink)
+	go requestAccounting.ConsumePerfSets(*discoveryInterval, *sendingInterval, *timeout)
+	parseInput(logSink, *requestAccounting)
 }
