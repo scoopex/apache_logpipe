@@ -42,11 +42,14 @@ https://www.alexedwards.net/blog/an-overview-of-go-tooling
 TODOs and Ideas:
 ----------------
 
+- Make logfile implementation threadsafe
+  (this is not neccessary in general, but interesting from academic view)
 - Refactor to more object oriented and unaderstandable code
+  - https://github.com/golang/mock
+  - https://blog.codecentric.de/2019/07/gomock-vs-testify/
 - Make the code more modular/structured 
 - Write unittests
 - Write documentation
-- Maintain a "current" link for the logfile
 - Add configuration file
 - Add a simple webserver which provides a statistics overview 
 - Understand go dependency management
@@ -54,6 +57,7 @@ TODOs and Ideas:
 DONE:
 -----
 
+- Maintain a "current" link for the logfile
 - Add a signal handler which closes logfile and output statistics
 - Implement ansynchronous statistics calculation
 - Implement ansynchronous statistics submission to zabbix
