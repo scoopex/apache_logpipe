@@ -41,8 +41,10 @@ func SetupGlogForTests() {
 
 // FileExists checks fopr file if it exists
 func FileExists(filename string) bool {
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		return false
+	if _, err := os.Lstat(filename); err == nil {
+		// exist
+		return true
 	}
-	return true
+	// not exist
+	return false
 }

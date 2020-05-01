@@ -38,7 +38,7 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 	for scanner.Scan() {
 		line := scanner.Text()
 		lines++
-		logSink.WriteLogLine(line)
+		logSink.SubmitLogLine(line)
 		match := lineRe.FindStringSubmatch(line)
 		if len(match) == 0 {
 			glog.V(1).Infof("not matched line: %s\n", line)

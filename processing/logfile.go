@@ -18,11 +18,12 @@ type LogSink struct {
 	CurrentFileName         string
 	fileDescriptor          *os.File
 	LinesWritten            int64
+	logMessageChan          chan string
+	streamStatus            chan int64
 }
 
 var singletonLogSink *LogSink = nil
 var mu sync.Mutex
-var countChan = make(chan int64, 100)
 
 // NewLogSink a new Logfile instance
 func NewLogSink(pattern string, symlink string) *LogSink {
@@ -30,29 +31,28 @@ func NewLogSink(pattern string, symlink string) *LogSink {
 	// establish a lock and release lock after completing this function
 	// encapsulate lock in nameless function to prevent deadlog
 	// inspired by http://marcio.io/2015/07/singleton-pattern-in-go/
-	func() {
-		mu.Lock()
-		defer mu.Unlock()
-		if singletonLogSink == nil {
-			singletonLogSink = new(LogSink)
-		}
-		singletonLogSink.FilenamePattern = pattern
-		singletonLogSink.SymlinkFile = symlink
-	}()
-	singletonLogSink.fileDescriptor = singletonLogSink.getFileDescriptor()
 
+	mu.Lock()
+	defer mu.Unlock()
+	if singletonLogSink == nil {
+		singletonLogSink = new(LogSink)
+		singletonLogSink.logMessageChan = make(chan string, 1000)
+		singletonLogSink.streamStatus = make(chan int64, 1)
+		go singletonLogSink.persistLogLines()
+	}
+
+	singletonLogSink.FilenamePattern = pattern
+	var err error
+	singletonLogSink.fileNamePatternStrftime, err = strftime.New(singletonLogSink.FilenamePattern)
+	if err != nil {
+		glog.Fatal(err.Error())
+	}
+
+	singletonLogSink.SymlinkFile = symlink
 	return singletonLogSink
 }
 
 func (c *LogSink) getFileDescriptor() *os.File {
-
-	if c.fileNamePatternStrftime == nil {
-		var err error
-		c.fileNamePatternStrftime, err = strftime.New(c.FilenamePattern)
-		if err != nil {
-			glog.Fatal(err.Error())
-		}
-	}
 	currentFilename := c.fileNamePatternStrftime.FormatString(time.Now())
 	if currentFilename != c.CurrentFileName {
 		var openFlags int
@@ -63,10 +63,6 @@ func (c *LogSink) getFileDescriptor() *os.File {
 			glog.Infof("open new file %s for writing", currentFilename)
 			openFlags = os.O_CREATE | os.O_WRONLY
 		}
-
-		// establish a lock and release lock after completing this function
-		mu.Lock()
-		defer mu.Unlock()
 
 		f, err := os.OpenFile(currentFilename, openFlags, 0644)
 		if err != nil {
@@ -87,7 +83,9 @@ func (c *LogSink) getFileDescriptor() *os.File {
 		}
 
 		c.CurrentFileName = currentFilename
-		c.fileDescriptor.Close()
+		if c.fileDescriptor != nil {
+			c.fileDescriptor.Close()
+		}
 		c.fileDescriptor = f
 	} else {
 		glog.V(2).Info("Reuse filedescriptor")
@@ -95,36 +93,64 @@ func (c *LogSink) getFileDescriptor() *os.File {
 	return c.fileDescriptor
 }
 
-// WriteLogLine writes a line to a logfile
-func (c *LogSink) WriteLogLine(line string) {
-
-	if c.FilenamePattern == "/dev/null" {
-		return
-	}
-	c.fileDescriptor = c.getFileDescriptor()
-
-	_, err := c.fileDescriptor.WriteString(line + "\n")
-	if err != nil {
-		glog.Fatal(err)
-	}
-	atomic.AddInt64(&c.LinesWritten, 1)
+// SubmitLogLine queues a logline for writing
+func (c *LogSink) SubmitLogLine(line string) {
+	c.logMessageChan <- line
 }
 
-// CloseLogfile closes the logfile :-)
-func (c *LogSink) CloseLogfile() error {
-	if c.FilenamePattern == "/dev/null" {
-		return nil
+func (c *LogSink) persistLogLines() {
+
+	for {
+		line := <-c.logMessageChan
+		c.fileDescriptor = c.getFileDescriptor()
+		if line == "<COMMIT>" {
+			c.fileDescriptor.Sync()
+			c.streamStatus <- c.LinesWritten
+			continue
+		} else if line == "<END>" || line == "<TERMINATE>" {
+			glog.V(1).Infof("closing logfile %s", c.CurrentFileName)
+			c.fileDescriptor.Close()
+			c.fileDescriptor = nil
+			c.CurrentFileName = ""
+			c.streamStatus <- c.LinesWritten
+			if line == "<TERMINATE>" {
+				return
+			}
+			continue
+		}
+
+		_, err := c.fileDescriptor.WriteString(line + "\n")
+		if err != nil {
+			glog.Fatal(err)
+		}
+		atomic.AddInt64(&c.LinesWritten, 1)
 	}
-	// establish a lock and release lock after completing this function
+}
+
+// TerminateLogStream termiates the consumer writer :-)
+func (c *LogSink) TerminateLogStream() {
 	mu.Lock()
 	defer mu.Unlock()
+	c.SubmitLogLine("<TERMINATE>")
+	nrLines := <-c.streamStatus
+	glog.V(1).Infof("Stream terminated after %d lines", nrLines)
+}
 
-	glog.V(1).Infof("closing logfile %s", c.CurrentFileName)
-	var err error
-	c.CurrentFileName = ""
-	if c.fileDescriptor != nil {
-		err = c.fileDescriptor.Close()
-		c.fileDescriptor = nil
-	}
-	return err
+// CloseLogStream closes the logfile :-)
+func (c *LogSink) CloseLogStream() {
+	mu.Lock()
+	defer mu.Unlock()
+	c.SubmitLogLine("<END>")
+	nrLines := <-c.streamStatus
+	glog.V(1).Infof("Stream closed after %d lines", nrLines)
+}
+
+// CommitLogStream flushes the current stream to disk
+func (c *LogSink) CommitLogStream() {
+	mu.Lock()
+	defer mu.Unlock()
+	c.SubmitLogLine("<COMMIT>")
+	glog.V(1).Infof("Waiting for commit")
+	nrLines := <-c.streamStatus
+	glog.V(1).Infof("Stream commit after %d lines", nrLines)
 }
