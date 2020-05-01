@@ -31,12 +31,17 @@ func GetHostname() string {
 	return name
 }
 
+var glogReady bool = false
+
 // SetupGlogForTests perform initalization of test logging
 func SetupGlogForTests() {
-	flag.Set("logtostderr", "true")
-	var logLevel string
-	flag.StringVar(&logLevel, "logLevel", "4", "test")
-	flag.Lookup("v").Value.Set(logLevel)
+	if !glogReady {
+		flag.Set("logtostderr", "true")
+		var logLevel string
+		flag.StringVar(&logLevel, "logLevel", "4", "test")
+		flag.Lookup("v").Value.Set(logLevel)
+		glogReady = true
+	}
 }
 
 // FileExists checks fopr file if it exists

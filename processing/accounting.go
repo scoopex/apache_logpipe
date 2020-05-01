@@ -58,7 +58,7 @@ var CompleteChan = make(chan int64)
 var SignalChan = make(chan os.Signal, 1)
 
 // NewRequestAccounting creates a RequestAccounting instance
-func NewRequestAccounting() *RequestAccounting {
+func NewRequestAccounting(discoveryInterval int, sendingInterval int, timeout int) *RequestAccounting {
 	// RequestAccountingInst configures the accounting
 	RequestAccountingInst := RequestAccounting{
 		// a list of accounting classes, defined in microseconds
@@ -78,6 +78,7 @@ func NewRequestAccounting() *RequestAccounting {
 			Disabled:     false,
 		},
 	}
+	go RequestAccountingInst.consumePerfSets(discoveryInterval, sendingInterval, timeout)
 	return &RequestAccountingInst
 }
 
@@ -182,7 +183,7 @@ func (c *RequestAccounting) sendData() {
 }
 
 // ConsumePerfSets from channel PerfSetChan and send discoveries and data
-func (c *RequestAccounting) ConsumePerfSets(discoveryIntervalSeconds int, sendingIntervalSeconds int, timeoutSeconds int) {
+func (c *RequestAccounting) consumePerfSets(discoveryIntervalSeconds int, sendingIntervalSeconds int, timeoutSeconds int) {
 	var count int64 = 0
 	var timeLastDiscovery time.Time = time.Now()
 	var timeLastStats time.Time = time.Now()

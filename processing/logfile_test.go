@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
@@ -113,8 +112,8 @@ func TestConcurrentLogfile(t *testing.T) {
 			ls = processing.NewLogSink(pattern, "")
 			for t := 0; t < numberOfLinesPerThread; t++ {
 				ls.SubmitLogLine(fmt.Sprintf("TEST1 - %d\n", num))
-				r := rand.Intn(10)
-				time.Sleep(time.Duration(r) * time.Millisecond)
+				//r := rand.Intn(10)
+				//time.Sleep(time.Duration(r) * time.Millisecond)
 				ls.SubmitLogLine(fmt.Sprintf("TEST2 - %d\n", num))
 			}
 			ls.CloseLogStream()

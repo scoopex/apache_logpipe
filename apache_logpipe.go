@@ -119,9 +119,7 @@ func main() {
 
 	logSink := *processing.NewLogSink(*outputLogfile, *outputLogfileSymlink)
 
-	requestAccounting := processing.NewRequestAccounting()
+	requestAccounting := processing.NewRequestAccounting(*discoveryInterval, *sendingInterval, *timeout)
 	requestAccounting.DisableZabbixSender(*zabbixSendDisabled)
-	// Asynchronous consumption of statistics
-	go requestAccounting.ConsumePerfSets(*discoveryInterval, *sendingInterval, *timeout)
 	parseInput(logSink, *requestAccounting)
 }
