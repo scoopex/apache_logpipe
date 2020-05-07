@@ -1,7 +1,6 @@
 package processing
 
 import (
-	"flag"
 	"os"
 	"runtime"
 
@@ -32,17 +31,6 @@ func GetHostname() string {
 }
 
 var glogReady bool = false
-
-// SetupGlogForTests perform initalization of test logging
-func SetupGlogForTests() {
-	if !glogReady {
-		flag.Set("logtostderr", "true")
-		var logLevel string
-		flag.StringVar(&logLevel, "logLevel", "1", "test")
-		flag.Lookup("v").Value.Set(logLevel)
-		glogReady = true
-	}
-}
 
 // FileExists checks fopr file if it exists
 func FileExists(filename string) bool {

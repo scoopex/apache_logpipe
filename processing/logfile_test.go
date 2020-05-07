@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -15,37 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var mu sync.Mutex
-
-func setupLogfileTestDir() string {
-	pc, _, _, ok := runtime.Caller(1)
-	details := runtime.FuncForPC(pc)
-	if !ok || details == nil {
-		glog.Error("unable to identify caller")
-		os.Exit(1)
-	}
-
-	dest := fmt.Sprintf("/tmp/%s_%d", details.Name(), rand.Intn(1000000))
-
-	err := os.MkdirAll(dest, os.FileMode(0777))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to create destination dir '%s' - %s\n", dest, err.Error())
-	}
-	glog.Infof("Dest Temporary Dir: %s", dest)
-	return dest
-}
-
-func removeTestDir(testDir string) {
-	glog.Infof("Removing testdir : %s", testDir)
-	err := os.RemoveAll(testDir)
-	if err != nil {
-		glog.Errorf("unable to remove test dir %s : %s", testDir, err.Error())
-	}
-}
-
 func init() {
-	processing.SetupGlogForTests()
-	glog.Info("Initalized Logsettings")
+	SetupGlogForTests()
 }
 
 // https://godoc.org/github.com/stretchr/testify/assert
@@ -53,9 +23,9 @@ func TestLogfile(t *testing.T) {
 
 	assert := assert.New(t)
 
-	testDir := setupLogfileTestDir()
+	testDir := SetupLogfileTestDir()
 	glog.Infof("Created testdir : %s", testDir)
-	defer removeTestDir(testDir)
+	defer RemoveTestDir(testDir)
 
 	symlink := testDir + "/current_apache_logpipe_symlink"
 	os.Symlink(testDir+"/dead-link-target", symlink)
@@ -89,8 +59,8 @@ func TestLogfile(t *testing.T) {
 
 func TestConcurrentLogfile(t *testing.T) {
 	assert := assert.New(t)
-	testdir := setupLogfileTestDir()
-	defer removeTestDir(testdir)
+	testdir := SetupLogfileTestDir()
+	defer RemoveTestDir(testdir)
 	pattern := testdir + "/apache_logpipe_test_concurrent_access.log_%Y-%m-%d"
 
 	ls := processing.NewLogSink(pattern, "")

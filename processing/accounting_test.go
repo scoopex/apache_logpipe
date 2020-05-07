@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	processing.SetupGlogForTests()
+	SetupGlogForTests()
 	glog.Info("Initalized Logsettings")
 }
 
