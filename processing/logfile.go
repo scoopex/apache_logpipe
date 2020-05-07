@@ -35,12 +35,13 @@ func NewLogSink(pattern string, symlink string) *LogSink {
 
 	mu.Lock()
 	defer mu.Unlock()
+
 	if singletonLogSink == nil {
 		singletonLogSink = new(LogSink)
 		singletonLogSink.logMessageChan = make(chan string, 1000)
 		singletonLogSink.streamStatus = make(chan int64, 1)
-		singletonLogSink.persisterActive = false
 		go singletonLogSink.persistLogLines()
+		singletonLogSink.persisterActive = true
 	}
 
 	singletonLogSink.FilenamePattern = pattern
@@ -114,19 +115,21 @@ func (c *LogSink) closeLog() {
 
 func (c *LogSink) persistLogLines() {
 
+	glog.Info("start persisting")
 	for {
 		line := <-c.logMessageChan
+
 		c.fileDescriptor = c.getFileDescriptor()
+
+		if line == "<END>" {
+			c.closeLog()
+			continue
+		}
 
 		if line == "<COMMIT>" {
 			glog.Infof("commit logfile %s", c.CurrentFileName)
 			c.fileDescriptor.Sync()
 			c.streamStatus <- c.LinesWritten
-			continue
-		}
-
-		if line == "<END>" {
-			c.closeLog()
 			continue
 		}
 
@@ -148,7 +151,7 @@ func (c *LogSink) persistLogLines() {
 func (c *LogSink) TerminateLogStream() {
 	mu.Lock()
 	defer mu.Unlock()
-	if !c.persisterActive {
+	if c.persisterActive == false {
 		glog.V(1).Infof("Logstream already terminated")
 		return
 	}
@@ -162,7 +165,7 @@ func (c *LogSink) TerminateLogStream() {
 func (c *LogSink) CloseLogStream() {
 	mu.Lock()
 	defer mu.Unlock()
-	if !c.persisterActive {
+	if c.persisterActive == false {
 		glog.V(1).Infof("Logstream already closed")
 		return
 	}
@@ -175,8 +178,8 @@ func (c *LogSink) CloseLogStream() {
 func (c *LogSink) CommitLogStream() {
 	mu.Lock()
 	defer mu.Unlock()
-	if !c.persisterActive {
-		glog.V(1).Infof("Logstream closed")
+	if c.persisterActive == false {
+		glog.V(1).Infof("Logstream closed, commit not possible")
 		return
 	}
 	c.SubmitLogLine("<COMMIT>")
