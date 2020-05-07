@@ -20,6 +20,7 @@ type LogSink struct {
 	LinesWritten            int64
 	logMessageChan          chan string
 	streamStatus            chan int64
+	persisterActive         bool
 }
 
 var singletonLogSink *LogSink = nil
@@ -38,6 +39,7 @@ func NewLogSink(pattern string, symlink string) *LogSink {
 		singletonLogSink = new(LogSink)
 		singletonLogSink.logMessageChan = make(chan string, 1000)
 		singletonLogSink.streamStatus = make(chan int64, 1)
+		singletonLogSink.persisterActive = false
 		go singletonLogSink.persistLogLines()
 	}
 
@@ -98,25 +100,40 @@ func (c *LogSink) SubmitLogLine(line string) {
 	c.logMessageChan <- line
 }
 
+func (c *LogSink) closeLog() {
+	if c.fileDescriptor != nil {
+		glog.V(1).Infof("closing logfile %s", c.CurrentFileName)
+		c.fileDescriptor.Close()
+		c.fileDescriptor = nil
+		c.CurrentFileName = ""
+	} else {
+		glog.Warningf("logfile %s already closed", c.CurrentFileName)
+	}
+	c.streamStatus <- c.LinesWritten
+}
+
 func (c *LogSink) persistLogLines() {
 
 	for {
 		line := <-c.logMessageChan
 		c.fileDescriptor = c.getFileDescriptor()
+
 		if line == "<COMMIT>" {
+			glog.Infof("commit logfile %s", c.CurrentFileName)
 			c.fileDescriptor.Sync()
 			c.streamStatus <- c.LinesWritten
 			continue
-		} else if line == "<END>" || line == "<TERMINATE>" {
-			glog.V(1).Infof("closing logfile %s", c.CurrentFileName)
-			c.fileDescriptor.Close()
-			c.fileDescriptor = nil
-			c.CurrentFileName = ""
-			c.streamStatus <- c.LinesWritten
-			if line == "<TERMINATE>" {
-				return
-			}
+		}
+
+		if line == "<END>" {
+			c.closeLog()
 			continue
+		}
+
+		if line == "<TERMINATE>" {
+			c.closeLog()
+			glog.Info("Stopping persister routine")
+			return
 		}
 
 		_, err := c.fileDescriptor.WriteString(line + "\n")
@@ -131,15 +148,24 @@ func (c *LogSink) persistLogLines() {
 func (c *LogSink) TerminateLogStream() {
 	mu.Lock()
 	defer mu.Unlock()
+	if !c.persisterActive {
+		glog.V(1).Infof("Logstream already terminated")
+		return
+	}
 	c.SubmitLogLine("<TERMINATE>")
 	nrLines := <-c.streamStatus
 	glog.V(1).Infof("Stream terminated after %d lines", nrLines)
+
 }
 
 // CloseLogStream closes the logfile :-)
 func (c *LogSink) CloseLogStream() {
 	mu.Lock()
 	defer mu.Unlock()
+	if !c.persisterActive {
+		glog.V(1).Infof("Logstream already closed")
+		return
+	}
 	c.SubmitLogLine("<END>")
 	nrLines := <-c.streamStatus
 	glog.V(1).Infof("Stream closed after %d lines", nrLines)
@@ -149,8 +175,12 @@ func (c *LogSink) CloseLogStream() {
 func (c *LogSink) CommitLogStream() {
 	mu.Lock()
 	defer mu.Unlock()
+	if !c.persisterActive {
+		glog.V(1).Infof("Logstream closed")
+		return
+	}
 	c.SubmitLogLine("<COMMIT>")
-	glog.V(1).Infof("Waiting for commit")
+	glog.Infof("Waiting for commit")
 	nrLines := <-c.streamStatus
 	glog.V(1).Infof("Stream commit after %d lines", nrLines)
 }

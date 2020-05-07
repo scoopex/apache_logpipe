@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
@@ -72,7 +73,7 @@ func TestLogfile(t *testing.T) {
 
 	glog.Info("***********************************************************************")
 	ls2 := processing.NewLogSink(testDir+"/apache_logpipe_test_access.log_%Y-%m-%d", symlink)
-	ls2.SubmitLogLine("TEST")
+	ls2.SubmitLogLine("TEST3")
 	ls2.CommitLogStream()
 	assert.Equal(int64(3), ls2.LinesWritten)
 	ls2.SubmitLogLine("TEST2")
@@ -95,12 +96,13 @@ func TestConcurrentLogfile(t *testing.T) {
 	ls := processing.NewLogSink(pattern, "")
 	ls.LinesWritten = 0
 	ls.SubmitLogLine("INIT")
+	ls.CommitLogStream()
 	theFile := ls.CurrentFileName
-	glog.Info(theFile)
+	glog.Infof("Current logfile: %s\n", theFile)
 	ls.CloseLogStream()
 
-	numberOfConcurrentThreads := 97
-	numberOfLinesPerThread := 17
+	numberOfConcurrentThreads := 10
+	numberOfLinesPerThread := 10
 
 	var wg sync.WaitGroup
 	for i := 0; i < numberOfConcurrentThreads; i++ {
@@ -112,8 +114,8 @@ func TestConcurrentLogfile(t *testing.T) {
 			ls = processing.NewLogSink(pattern, "")
 			for t := 0; t < numberOfLinesPerThread; t++ {
 				ls.SubmitLogLine(fmt.Sprintf("TEST1 - %d\n", num))
-				//r := rand.Intn(10)
-				//time.Sleep(time.Duration(r) * time.Millisecond)
+				r := rand.Intn(10)
+				time.Sleep(time.Duration(r) * time.Millisecond)
 				ls.SubmitLogLine(fmt.Sprintf("TEST2 - %d\n", num))
 			}
 			ls.CloseLogStream()
@@ -122,7 +124,7 @@ func TestConcurrentLogfile(t *testing.T) {
 	wg.Wait()
 	ls = processing.NewLogSink(pattern, "")
 	ls.SubmitLogLine("THIS IS THE END")
-	ls.CloseLogStream()
+	ls.CommitLogStream()
 	assert.Equal(int64((numberOfConcurrentThreads*numberOfLinesPerThread*2)+1+1), ls.LinesWritten)
 	ls.TerminateLogStream()
 }

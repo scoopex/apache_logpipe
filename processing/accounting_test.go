@@ -19,7 +19,8 @@ func TestSimpleRequestAccounting(t *testing.T) {
 	requestAccounting := processing.NewRequestAccounting(3, 2, 1)
 	requestAccounting.DisableZabbixSender(true)
 
-	for t := 0; t < 10; t++ {
+	var testDatasets int = 10
+	for t := 0; t < testDatasets; t++ {
 		processing.PerfSetChan <- processing.PerfSet{
 			Domain: "dom1",
 			Ident:  "theFoo",
@@ -35,6 +36,6 @@ func TestSimpleRequestAccounting(t *testing.T) {
 	}
 
 	linesAccounted := <-processing.CompleteChan
-	assert.Equal(10, linesAccounted)
+	assert.Equal(int64(testDatasets), linesAccounted)
 
 }
