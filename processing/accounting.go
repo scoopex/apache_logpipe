@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	. "github.com/blacked/go-zabbix"
@@ -45,10 +46,11 @@ type zabbixConfigSetting struct {
 
 // RequestAccounting account requests delivered by PerfSetChan
 type RequestAccounting struct {
-	classes         []int
-	requestMappings map[string]*regexp.Regexp
-	stats           map[string]map[string]*accountingSet
-	zabbixConfig    zabbixConfigSetting
+	classes           []int
+	requestMappings   map[string]*regexp.Regexp
+	stats             map[string]map[string]*accountingSet
+	zabbixConfig      zabbixConfigSetting
+	failedZabbixSends int64
 }
 
 // CompleteChan is used to wait for accounting completion
@@ -56,6 +58,8 @@ var CompleteChan = make(chan int64)
 
 // SignalChan is used to wait for signals
 var SignalChan = make(chan os.Signal, 1)
+
+var sendMutex sync.Mutex
 
 // NewRequestAccounting creates a RequestAccounting instance
 func NewRequestAccounting(discoveryInterval int, sendingInterval int, timeout int) *RequestAccounting {
@@ -82,6 +86,11 @@ func NewRequestAccounting(discoveryInterval int, sendingInterval int, timeout in
 	return &RequestAccountingInst
 }
 
+// GetFailedZabbixSends Returns the number of failed zabbix data deliveries
+func (c *RequestAccounting) GetFailedZabbixSends() int64 {
+	return c.failedZabbixSends
+}
+
 // SetRequestMappings defined a new set of request mappings
 func (c *RequestAccounting) SetRequestMappings(mappings map[string]*regexp.Regexp) {
 	c.requestMappings = mappings
@@ -103,6 +112,8 @@ func (c *RequestAccounting) getPerfclass(responsetime int) int {
 }
 
 func (c *RequestAccounting) sendDiscovery() {
+	sendMutex.Lock()
+	defer sendMutex.Unlock()
 	glog.Info("Sending discovery")
 
 	var discoveryDataArray []map[string]string
@@ -127,7 +138,6 @@ func (c *RequestAccounting) sendDiscovery() {
 }
 
 func (c *RequestAccounting) sendZabbixMetrics(metrics []*Metric) {
-
 	if c.zabbixConfig.Disabled {
 		glog.Info("Zabbix sender disabled, not sending data")
 	} else {
@@ -136,6 +146,7 @@ func (c *RequestAccounting) sendZabbixMetrics(metrics []*Metric) {
 		res, err := z.Send(packet)
 		if err != nil {
 			glog.Errorf("unable to send discovery key : '%s' - >>>%s<<<", err.Error(), res)
+			c.failedZabbixSends++
 		}
 	}
 }
@@ -147,6 +158,8 @@ func (c *RequestAccounting) createZabbixMetric(dataTime int64, value string, key
 }
 
 func (c *RequestAccounting) sendData() {
+	sendMutex.Lock()
+	defer sendMutex.Unlock()
 	glog.Info("Sending data")
 	var metrics []*Metric
 
@@ -182,6 +195,16 @@ func (c *RequestAccounting) sendData() {
 	c.sendZabbixMetrics(metrics)
 }
 
+// CompleteStream finishes processing
+func CompleteStream() {
+	PerfSetChan <- PerfSet{
+		Domain: "COMPLETE",
+		Ident:  "COMPLETE",
+		Time:   "0",
+		Code:   1,
+	}
+}
+
 // ConsumePerfSets from channel PerfSetChan and send discoveries and data
 func (c *RequestAccounting) consumePerfSets(discoveryIntervalSeconds int, sendingIntervalSeconds int, timeoutSeconds int) {
 	var count int64 = 0
@@ -202,14 +225,14 @@ func (c *RequestAccounting) consumePerfSets(discoveryIntervalSeconds int, sendin
 			{
 				if perfSet.Domain == "COMPLETE" {
 					glog.Info("Processing complete")
-					c.sendDiscovery()
-					c.sendData()
+					c.SubmitData()
 					CompleteChan <- count
 					return
 				}
-				glog.V(2).Info("Consume a PerfSet")
-				c.AccountRequest(perfSet.Domain, perfSet.Ident, perfSet.Time, perfSet.Code)
-				count++
+				glog.V(2).Infof("Consume a PerfSet domain: %s, ident: %s, time %s, code %d", perfSet.Domain, perfSet.Ident, perfSet.Time, perfSet.Code)
+				if c.AccountRequest(perfSet.Domain, perfSet.Ident, perfSet.Time, perfSet.Code) {
+					count++
+				}
 			}
 		case <-time.After(time.Duration(timeoutSeconds) * time.Second):
 			{
@@ -232,11 +255,18 @@ func (c *RequestAccounting) consumePerfSets(discoveryIntervalSeconds int, sendin
 	}
 }
 
+// SubmitData delivers measures and Discovery
+func (c *RequestAccounting) SubmitData() {
+	c.sendDiscovery()
+	c.sendData()
+}
+
 // AccountRequest accounts the request :-)
-func (c *RequestAccounting) AccountRequest(domain string, uri string, time string, code int) {
+func (c *RequestAccounting) AccountRequest(domain string, uri string, time string, code int) bool {
 	responsetime, err := strconv.Atoi(time)
 	if err != nil {
-		glog.Fatalf("unable to convert time '%s' to a string", time)
+		glog.Infof("unable to convert time '%s' to a string", time)
+		return false
 	}
 
 	for name, reName := range c.requestMappings {
@@ -262,6 +292,7 @@ func (c *RequestAccounting) AccountRequest(domain string, uri string, time strin
 		c.stats[domain][name].codes[code]++
 		c.stats[domain][name].classes[c.getPerfclass(responsetime)]++
 	}
+	return true
 }
 
 // Showstats displays the statistics

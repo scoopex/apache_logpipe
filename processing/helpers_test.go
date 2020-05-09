@@ -45,9 +45,10 @@ func SetupGlogForTests() {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if !glogReady {
+		flag.Parse()
 		flag.Set("logtostderr", "true")
 		var logLevel string
-		flag.StringVar(&logLevel, "logLevel", "1", "test")
+		flag.StringVar(&logLevel, "logLevel", "2", "test")
 		flag.Lookup("v").Value.Set(logLevel)
 		glogReady = true
 		glog.Info("Initialized logsettings")

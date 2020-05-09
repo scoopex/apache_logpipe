@@ -77,13 +77,7 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 			}
 		}
 	}
-
-	processing.PerfSetChan <- processing.PerfSet{
-		Domain: "COMPLETE",
-		Ident:  "COMPLETE",
-		Time:   "0",
-		Code:   1,
-	}
+	logSink.CommitLogStream()
 
 	linesAccounted := <-processing.CompleteChan
 	glog.V(1).Infof("Accounted %d lines", linesAccounted)
