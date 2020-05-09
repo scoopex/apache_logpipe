@@ -20,7 +20,7 @@ func init() {
 
 // https://godoc.org/github.com/stretchr/testify/assert
 func TestLogfile(t *testing.T) {
-
+	processing.DestroyLogSinkSingleton()
 	assert := assert.New(t)
 
 	testDir := SetupLogfileTestDir()
@@ -58,6 +58,7 @@ func TestLogfile(t *testing.T) {
 }
 
 func TestConcurrentLogfile(t *testing.T) {
+	processing.DestroyLogSinkSingleton()
 	assert := assert.New(t)
 	testdir := SetupLogfileTestDir()
 	defer RemoveTestDir(testdir)

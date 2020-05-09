@@ -26,6 +26,15 @@ type LogSink struct {
 var singletonLogSink *LogSink = nil
 var mu sync.Mutex
 
+// DestroyLogSinkSingleton destroy the Singleton Reference of the Logsync,
+// this is used to get a identical start situation for tests
+func DestroyLogSinkSingleton() {
+	mu.Lock()
+	defer mu.Unlock()
+	glog.Info("Destroy logsink")
+	singletonLogSink = nil
+}
+
 // NewLogSink a new Logfile instance
 func NewLogSink(pattern string, symlink string) *LogSink {
 
@@ -136,6 +145,7 @@ func (c *LogSink) persistLogLines() {
 		if line == "<TERMINATE>" {
 			c.closeLog()
 			glog.Info("Stopping persister routine")
+			c.persisterActive = false
 			return
 		}
 
