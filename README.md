@@ -68,7 +68,7 @@ DONE:
   https://gobyexample.com/command-line-flags
 - Parse loglines
 - Calculate statistics
-- Add getopts parser
+- Add option parser
 - Write logfile
 
 

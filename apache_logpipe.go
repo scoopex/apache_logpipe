@@ -3,7 +3,6 @@ package main
 import (
 	"apache_logpipe/processing"
 	"bufio"
-	"flag"
 	"os"
 	"os/signal"
 	"regexp"
@@ -94,26 +93,18 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 }
 
 func main() {
-	outputLogfile := flag.String("output_logfile", "/dev/null", "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
-	outputLogfileSymlink := flag.String("symlink", "", "A symlink which points to the current logfile")
-	sendingInterval := flag.Int("sending_interval", 300, "Sending interval in seconds")
-	timeout := flag.Int("timeout", 5, "timeout in seconds")
-	discoveryInterval := flag.Int("discovery_interval", 900, "Discovery interval in seconds")
-	zabbixServer := flag.String("zabbix_server", "127.0.0.1", "The zabbix server")
-	zabbixHost := flag.String("zabbix_host", "127.0.0.1", "The zabbix host")
-	zabbixSendDisabled := flag.Bool("disable_zabbix", false, "Disable zabbix sender")
-	flag.Set("logtostderr", "true")
-	flag.Parse()
+
+	cfg := processing.NewConfiguration()
 
 	glog.Infof("Starting apache_logpipe: output_logfile: %s, sending_interval: %d, discovery_interval: %d, zabbix_server: %s, zabbix_host: %s\n",
-		*outputLogfile, *sendingInterval, *discoveryInterval, *zabbixServer, *zabbixHost)
+		*cfg.OutputLogfile, *cfg.SendingInterval, *cfg.DiscoveryInterval, *cfg.ZabbixServer, *cfg.ZabbixHost)
 
 	// Install signal handler
 	signal.Notify(processing.SignalChan, syscall.SIGINT, syscall.SIGTERM)
 
-	logSink := *processing.NewLogSink(*outputLogfile, *outputLogfileSymlink)
+	logSink := *processing.NewLogSink(*cfg.OutputLogfile, *cfg.OutputLogfileSymlink)
 
-	requestAccounting := processing.NewRequestAccounting(*discoveryInterval, *sendingInterval, *timeout)
-	requestAccounting.DisableZabbixSender(*zabbixSendDisabled)
+	requestAccounting := processing.NewRequestAccounting(*cfg.DiscoveryInterval, *cfg.SendingInterval, *cfg.Timeout)
+	requestAccounting.DisableZabbixSender(*cfg.ZabbixSendDisabled)
 	parseInput(logSink, *requestAccounting)
 }
