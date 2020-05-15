@@ -172,16 +172,17 @@ func (c *LogSink) TerminateLogStream() {
 }
 
 // CloseLogStream closes the logfile :-)
-func (c *LogSink) CloseLogStream() {
+func (c *LogSink) CloseLogStream() int64 {
 	mu.Lock()
 	defer mu.Unlock()
 	if c.persisterActive == false {
 		glog.V(1).Infof("Logstream already closed")
-		return
+		return 0
 	}
 	c.SubmitLogLine("<END>")
 	nrLines := <-c.streamStatus
 	glog.V(1).Infof("Stream closed after %d lines", nrLines)
+	return nrLines
 }
 
 // CommitLogStream flushes the current stream to disk

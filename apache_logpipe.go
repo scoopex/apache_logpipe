@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"os"
 	"os/signal"
-	"regexp"
 	"strconv"
 	"syscall"
 	"time"
@@ -21,12 +20,7 @@ var discoveryInterval int
 var zabbixServer string
 var zabbixHost string
 
-var lineRe = regexp.MustCompile(`^\d+\.\d+\.\d+\.\d+ (?P<domain>[^ ]+?)\s.*] "(GET|POST|PUT|PROPFIND|OPTIONS|DELETE) (?P<uri>/[^ ]*?)(?P<getparam>\?[^ ]*?)? HTTP.*" (?P<code>\d+) .* (?P<time>\d+)$`)
-
-// regex insensitive static file ending
-var requestStaticRe = regexp.MustCompile(`(?i).+\.(gif|jpg|jpeg|png|ico|flv|swf|js|css|txt|woff|ttf)`)
-
-func parseInput(logSink processing.LogSink, requestAccounting processing.RequestAccounting) {
+func parseInput(logSink processing.LogSink, requestAccounting processing.RequestAccounting, cfg processing.Configuration) {
 
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -38,14 +32,14 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 		line := scanner.Text()
 		lines++
 		logSink.SubmitLogLine(line)
-		match := lineRe.FindStringSubmatch(line)
+		match := cfg.RegexLogline.FindStringSubmatch(line)
 		if len(match) == 0 {
 			glog.V(1).Infof("not matched line: %s\n", line)
 			linesNotMatched++
 			continue
 		}
 		result := make(map[string]string)
-		for i, name := range lineRe.SubexpNames() {
+		for i, name := range cfg.RegexLogline.SubexpNames() {
 			if i != 0 && name != "" {
 				result[name] = match[i]
 			}
@@ -59,7 +53,7 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 			linesNotMatched++
 			continue
 		}
-		matchStatic := requestStaticRe.FindStringSubmatch(result["uri"])
+		matchStatic := cfg.RegexStaticContent.FindStringSubmatch(result["uri"])
 		if len(matchStatic) == 0 {
 			processing.PerfSetChan <- processing.PerfSet{
 				Domain: result["domain"],
@@ -76,9 +70,8 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 			}
 		}
 	}
-	logSink.CommitLogStream()
-
-	linesAccounted := <-processing.CompleteChan
+	linesAccounted := logSink.CloseLogStream()
+	//linesAccounted := <-processing.CompleteChan
 	glog.V(1).Infof("Accounted %d lines", linesAccounted)
 	if linesAccounted != lines-linesNotMatched {
 		glog.Errorf("Accounted lines are not equal to matched lines (total lines: %d, lines not matched: %d, lines accounted: %d)",
@@ -95,6 +88,7 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 func main() {
 
 	cfg := processing.NewConfiguration()
+	cfg.LoadFile()
 
 	glog.Infof("Starting apache_logpipe: output_logfile: %s, sending_interval: %d, discovery_interval: %d, zabbix_server: %s, zabbix_host: %s\n",
 		*cfg.OutputLogfile, *cfg.SendingInterval, *cfg.DiscoveryInterval, *cfg.ZabbixServer, *cfg.ZabbixHost)
@@ -106,5 +100,5 @@ func main() {
 
 	requestAccounting := processing.NewRequestAccounting(*cfg.DiscoveryInterval, *cfg.SendingInterval, *cfg.Timeout)
 	requestAccounting.DisableZabbixSender(*cfg.ZabbixSendDisabled)
-	parseInput(logSink, *requestAccounting)
+	parseInput(logSink, *requestAccounting, *cfg)
 }

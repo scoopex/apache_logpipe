@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"runtime"
 	"sync"
 
@@ -53,4 +54,14 @@ func SetupGlogForTests() {
 		glogReady = true
 		glog.Info("Initialized logsettings")
 	}
+}
+
+func GetProjectBaseDir() string {
+	_, filename, _, _ := runtime.Caller(0)
+	dir := path.Join(path.Dir(filename), "..")
+	err := os.Chdir(dir)
+	if err != nil {
+		panic(err)
+	}
+	return dir
 }
