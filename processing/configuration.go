@@ -73,6 +73,13 @@ func (c *Configuration) LoadFile() {
 	regexStaticContentString := `(?i).+\.(gif|jpg|jpeg|png|ico|flv|swf|js|css|txt|woff|ttf)`
 	c.RegexLogline = getRegexValue(iniFile, "global", "regex_logline", regexLogLineString, regexLogLineString)
 	c.RegexStaticContent = getRegexValue(iniFile, "global", "regex_static_content", regexStaticContentString, regexStaticContentString)
+
+	for _, section := range iniFile.SectionStrings() {
+		if section == "global" || section == "DEFAULT" {
+			continue
+		}
+		glog.Infof(">>>>>>>>>>>>>>>>>>>>> %s<<<<<<<<<<<<<<<<<<", section)
+	}
 }
 
 func getRegexValue(iniFile *ini.File, section string, key string, currentValue string, defaultValue string) *regexp.Regexp {
