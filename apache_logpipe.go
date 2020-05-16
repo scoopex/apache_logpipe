@@ -3,6 +3,7 @@ package main
 import (
 	"apache_logpipe/processing"
 	"bufio"
+	"flag"
 	"os"
 	"os/signal"
 	"strconv"
@@ -88,17 +89,33 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 func main() {
 
 	cfg := processing.NewConfiguration()
-	cfg.LoadFile()
+
+	/*
+	* Parsing the arguments
+	 */
+	configFile := *flag.String("config", "", "Name of the config file")
+	cfg.OutputLogfile = *flag.String("output_logfile", cfg.OutputLogfile, "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
+	cfg.OutputLogfileSymlink = *flag.String("symlink", cfg.OutputLogfileSymlink, "A symlink which points to the current logfile")
+	cfg.SendingInterval = *flag.Int("sending_interval", cfg.SendingInterval, "Sending interval in seconds")
+	cfg.Timeout = *flag.Int("timeout", cfg.Timeout, "timeout in seconds (default: 5 seconds)")
+	cfg.DiscoveryInterval = *flag.Int("discovery_interval", cfg.DiscoveryInterval, "Discovery interval in seconds")
+	cfg.ZabbixServer = *flag.String("zabbix_server", cfg.ZabbixServer, "The hostname of the zabbix server")
+	cfg.ZabbixHost = *flag.String("zabbix_host", cfg.ZabbixHost, "The zabbix host to report data for")
+	cfg.ZabbixSendDisabled = *flag.Bool("disable_zabbix", cfg.ZabbixSendDisabled, "Disable zabbix sender")
+
+	flag.Set("logtostderr", "true")
+	flag.Parse()
+	cfg.LoadFile(configFile)
 
 	glog.Infof("Starting apache_logpipe: output_logfile: %s, sending_interval: %d, discovery_interval: %d, zabbix_server: %s, zabbix_host: %s\n",
-		*cfg.OutputLogfile, *cfg.SendingInterval, *cfg.DiscoveryInterval, *cfg.ZabbixServer, *cfg.ZabbixHost)
+		cfg.OutputLogfile, cfg.SendingInterval, cfg.DiscoveryInterval, cfg.ZabbixServer, cfg.ZabbixHost)
 
 	// Install signal handler
 	signal.Notify(processing.SignalChan, syscall.SIGINT, syscall.SIGTERM)
 
-	logSink := *processing.NewLogSink(*cfg.OutputLogfile, *cfg.OutputLogfileSymlink)
+	logSink := *processing.NewLogSink(cfg.OutputLogfile, cfg.OutputLogfileSymlink)
 
-	requestAccounting := processing.NewRequestAccounting(*cfg.DiscoveryInterval, *cfg.SendingInterval, *cfg.Timeout)
-	requestAccounting.DisableZabbixSender(*cfg.ZabbixSendDisabled)
+	requestAccounting := processing.NewRequestAccounting(cfg.DiscoveryInterval, cfg.SendingInterval, cfg.Timeout)
+	requestAccounting.DisableZabbixSender(cfg.ZabbixSendDisabled)
 	parseInput(logSink, *requestAccounting, *cfg)
 }

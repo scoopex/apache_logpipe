@@ -1,7 +1,6 @@
 package processing
 
 import (
-	"flag"
 	"os"
 	"regexp"
 
@@ -10,69 +9,73 @@ import (
 )
 
 type Configuration struct {
-	OutputLogfile            *string
-	OutputLogfileSymlink     *string
-	SendingInterval          *int
-	Timeout                  *int
-	DiscoveryInterval        *int
-	ZabbixServer             *string
-	ZabbixHost               *string
-	ZabbixSendDisabled       *bool
-	regexLogLineString       *string
-	regexStaticContentString *string
-	RegexStaticContent       *regexp.Regexp
-	RegexLogline             *regexp.Regexp
-	configFile               *string
+	OutputLogfile            string
+	OutputLogfileSymlink     string
+	SendingInterval          int
+	Timeout                  int
+	DiscoveryInterval        int
+	ZabbixServer             string
+	ZabbixHost               string
+	ZabbixSendDisabled       bool
+	RegexLogline             regexp.Regexp
+	RegexStaticContent       regexp.Regexp
+	configFile               string
+	regexLogLineString       string
+	regexStaticContentString string
 }
 
 // NewConfiguration create a new Configuration object
 func NewConfiguration() *Configuration {
-
 	var cfg = new(Configuration)
 
-	/*
-	* Parsing the arguments
-	 */
-	cfg.configFile = flag.String("config", "", "Name of the config file")
-	cfg.OutputLogfile = flag.String("output_logfile", "", "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
-	cfg.OutputLogfileSymlink = flag.String("symlink", "", "A symlink which points to the current logfile")
-	cfg.SendingInterval = flag.Int("sending_interval", 0, "Sending interval in seconds (default: 120 seconds)")
-	cfg.Timeout = flag.Int("timeout", 0, "timeout in seconds (default: 5 seconds)")
-	cfg.DiscoveryInterval = flag.Int("discovery_interval", 0, "Discovery interval in seconds (default: 900 seconds)")
-	cfg.ZabbixServer = flag.String("zabbix_server", "", "The zabbix server (default: 'zabbix')")
-	cfg.ZabbixHost = flag.String("zabbix_host", "", "The zabbix host (default: "+GetHostname()+")")
-	cfg.ZabbixSendDisabled = flag.Bool("disable_zabbix", false, "Disable zabbix sender")
-
-	flag.Set("logtostderr", "true")
-	flag.Parse()
+	cfg.configFile = ""
+	cfg.OutputLogfile = "/dev/null"
+	cfg.OutputLogfileSymlink = ""
+	cfg.SendingInterval = 120
+	cfg.Timeout = 900
+	cfg.ZabbixServer = "zabbix"
+	cfg.ZabbixHost = GetHostname()
+	cfg.ZabbixSendDisabled = false
+	cfg.regexLogLineString = `^\d+\.\d+\.\d+\.\d+ (?P<domain>[^ ]+?)\s.*] "(GET|POST|PUT|PROPFIND|OPTIONS|DELETE) (?P<uri>/[^ ]*?)(?P<getparam>\?[^ ]*?)? HTTP.*" (?P<code>\d+) .* (?P<time>\d+)$`
+	cfg.regexStaticContentString = `(?i).+\.(gif|jpg|jpeg|png|ico|flv|swf|js|css|txt|woff|ttf)`
+	cfg.RegexLogline = *regexp.MustCompile(cfg.regexStaticContentString)
+	cfg.RegexStaticContent = *regexp.MustCompile(cfg.regexStaticContentString)
 	return cfg
 }
 
-func (c *Configuration) LoadFile() {
+// LoadFile loads the values defined in the file
+func (c *Configuration) LoadFile(configFile string) {
+
+	c.configFile = configFile
+
+	if c.configFile == "" {
+		glog.Info("No config file specified, using defaults and commandline args only")
+		return
+	}
 
 	// https://ini.unknwon.io/docs/intro/getting_started
 	var iniFile *ini.File = nil
 	var err error = nil
-	if *c.configFile != "" {
-		glog.Infof("Loading config file >>>%s<<< now", *c.configFile)
-		iniFile, err = ini.Load(*c.configFile)
-		if err != nil {
-			glog.Errorf("Failed to read file: %v", err)
-			os.Exit(1)
-		}
-	}
-	*c.OutputLogfile = getStringValue(iniFile, "global", "output_logile", *c.OutputLogfile, "/dev/null")
-	*c.OutputLogfileSymlink = getStringValue(iniFile, "global", "symlink", *c.OutputLogfileSymlink, "")
-	*c.SendingInterval = getIntValue(iniFile, "global", "sending_interval", *c.SendingInterval, 120)
-	*c.Timeout = getIntValue(iniFile, "global", "timeout", *c.Timeout, 5)
-	*c.DiscoveryInterval = getIntValue(iniFile, "global", "discovery_interval", *c.DiscoveryInterval, 900)
-	*c.ZabbixServer = getStringValue(iniFile, "global", "zabbix_server", *c.ZabbixServer, "zabbix")
-	*c.ZabbixHost = getStringValue(iniFile, "global", "zabbix_host", *c.ZabbixHost, GetHostname())
 
-	regexLogLineString := `^\d+\.\d+\.\d+\.\d+ (?P<domain>[^ ]+?)\s.*] "(GET|POST|PUT|PROPFIND|OPTIONS|DELETE) (?P<uri>/[^ ]*?)(?P<getparam>\?[^ ]*?)? HTTP.*" (?P<code>\d+) .* (?P<time>\d+)$`
-	regexStaticContentString := `(?i).+\.(gif|jpg|jpeg|png|ico|flv|swf|js|css|txt|woff|ttf)`
-	c.RegexLogline = getRegexValue(iniFile, "global", "regex_logline", regexLogLineString, regexLogLineString)
-	c.RegexStaticContent = getRegexValue(iniFile, "global", "regex_static_content", regexStaticContentString, regexStaticContentString)
+	glog.Infof("Loading config file >>>%s<<< now", c.configFile)
+	iniFile, err = ini.Load(c.configFile)
+	if err != nil {
+		glog.Errorf("Failed to read file: %v", err)
+		os.Exit(1)
+	}
+
+	defaultCfg := NewConfiguration()
+
+	c.OutputLogfile = getStringValue(iniFile, "global", "output_logile", c.OutputLogfile, defaultCfg.OutputLogfile)
+	c.OutputLogfileSymlink = getStringValue(iniFile, "global", "symlink", c.OutputLogfileSymlink, defaultCfg.OutputLogfileSymlink)
+	c.SendingInterval = getIntValue(iniFile, "global", "sending_interval", c.SendingInterval, defaultCfg.SendingInterval)
+	c.Timeout = getIntValue(iniFile, "global", "timeout", c.Timeout, defaultCfg.Timeout)
+	c.DiscoveryInterval = getIntValue(iniFile, "global", "discovery_interval", c.DiscoveryInterval, defaultCfg.DiscoveryInterval)
+	c.ZabbixServer = getStringValue(iniFile, "global", "zabbix_server", c.ZabbixServer, defaultCfg.ZabbixServer)
+	c.ZabbixHost = getStringValue(iniFile, "global", "zabbix_host", c.ZabbixHost, defaultCfg.ZabbixHost)
+
+	c.RegexLogline = getRegexValue(iniFile, "global", "regex_logline", "", defaultCfg.regexLogLineString)
+	c.RegexStaticContent = getRegexValue(iniFile, "global", "regex_static_content", "", defaultCfg.regexStaticContentString)
 
 	for _, section := range iniFile.SectionStrings() {
 		if section == "global" || section == "DEFAULT" {
@@ -82,19 +85,19 @@ func (c *Configuration) LoadFile() {
 	}
 }
 
-func getRegexValue(iniFile *ini.File, section string, key string, currentValue string, defaultValue string) *regexp.Regexp {
-	if iniFile != nil && iniFile.Section(section).HasKey(key) && currentValue == "" {
-		return regexp.MustCompile(iniFile.Section(section).Key(key).MustString(defaultValue))
+func getRegexValue(iniFile *ini.File, section string, key string, currentValue string, defaultValue string) regexp.Regexp {
+	if iniFile != nil && iniFile.Section(section).HasKey(key) && currentValue == defaultValue {
+		return *regexp.MustCompile(iniFile.Section(section).Key(key).MustString(defaultValue))
 	}
 	if currentValue == "" {
-		return regexp.MustCompile(defaultValue)
+		return *regexp.MustCompile(defaultValue)
 	}
-	return regexp.MustCompile(defaultValue)
+	return *regexp.MustCompile(defaultValue)
 
 }
 
 func getStringValue(iniFile *ini.File, section string, key string, currentValue string, defaultValue string) string {
-	if iniFile != nil && iniFile.Section(section).HasKey(key) && currentValue == "" {
+	if iniFile != nil && iniFile.Section(section).HasKey(key) && currentValue == defaultValue {
 		return iniFile.Section(section).Key(key).MustString(defaultValue)
 	}
 	if currentValue == "" {
@@ -105,7 +108,7 @@ func getStringValue(iniFile *ini.File, section string, key string, currentValue 
 }
 
 func getIntValue(iniFile *ini.File, section string, key string, currentValue int, defaultValue int) int {
-	if iniFile != nil && iniFile.Section(section).HasKey(key) && currentValue == 0 {
+	if iniFile != nil && iniFile.Section(section).HasKey(key) && currentValue == defaultValue {
 		return iniFile.Section(section).Key(key).MustInt(defaultValue)
 	}
 	if currentValue == 0 {
