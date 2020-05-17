@@ -48,7 +48,7 @@ func SetupGlogForTests() {
 	if glogReady {
 		return
 	}
-	flag.Parse()
+	// flag.Parse()
 	flag.Set("logtostderr", "true")
 	var logLevel string
 	flag.StringVar(&logLevel, "logLevel", "2", "test")
