@@ -12,7 +12,7 @@ import (
 	"github.com/golang/glog"
 )
 
-var glogReady bool = true
+var glogReady bool = false
 var mutex sync.Mutex
 
 func SetupLogfileTestDir() string {
@@ -45,15 +45,16 @@ func RemoveTestDir(testDir string) {
 func SetupGlogForTests() {
 	mutex.Lock()
 	defer mutex.Unlock()
-	if !glogReady {
-		flag.Parse()
-		flag.Set("logtostderr", "true")
-		var logLevel string
-		flag.StringVar(&logLevel, "logLevel", "2", "test")
-		flag.Lookup("v").Value.Set(logLevel)
-		glogReady = true
-		glog.Info("Initialized logsettings")
+	if glogReady {
+		return
 	}
+	flag.Parse()
+	flag.Set("logtostderr", "true")
+	var logLevel string
+	flag.StringVar(&logLevel, "logLevel", "2", "test")
+	flag.Lookup("v").Value.Set(logLevel)
+	glogReady = true
+	glog.Info("Initialized logsettings")
 }
 
 func GetProjectBaseDir() string {

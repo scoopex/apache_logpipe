@@ -17,17 +17,16 @@ type Configuration struct {
 	ZabbixServer             string
 	ZabbixHost               string
 	ZabbixSendDisabled       bool
-	RegexLogline             regexp.Regexp
-	RegexStaticContent       regexp.Regexp
+	ResponstimeClasses       []int
+	RequestMappings          map[string]*regexp.Regexp
 	configFile               string
-	regexLogLineString       string
-	regexStaticContentString string
+	RegexLogLineString       string
+	RegexStaticContentString string
 }
 
 // NewConfiguration create a new Configuration object
 func NewConfiguration() *Configuration {
 	var cfg = new(Configuration)
-
 	cfg.configFile = ""
 	cfg.OutputLogfile = "/dev/null"
 	cfg.OutputLogfileSymlink = ""
@@ -36,10 +35,12 @@ func NewConfiguration() *Configuration {
 	cfg.ZabbixServer = "zabbix"
 	cfg.ZabbixHost = GetHostname()
 	cfg.ZabbixSendDisabled = false
-	cfg.regexLogLineString = `^\d+\.\d+\.\d+\.\d+ (?P<domain>[^ ]+?)\s.*] "(GET|POST|PUT|PROPFIND|OPTIONS|DELETE) (?P<uri>/[^ ]*?)(?P<getparam>\?[^ ]*?)? HTTP.*" (?P<code>\d+) .* (?P<time>\d+)$`
-	cfg.regexStaticContentString = `(?i).+\.(gif|jpg|jpeg|png|ico|flv|swf|js|css|txt|woff|ttf)`
-	cfg.RegexLogline = *regexp.MustCompile(cfg.regexStaticContentString)
-	cfg.RegexStaticContent = *regexp.MustCompile(cfg.regexStaticContentString)
+	cfg.RegexLogLineString = `^\d+\.\d+\.\d+\.\d+ (?P<domain>[^ ]+?)\s.*] "(GET|POST|PUT|PROPFIND|OPTIONS|DELETE) (?P<uri>/[^ ]*?)(?P<getparam>\?[^ ]*?)? HTTP.*" (?P<code>\d+) .* (?P<time>\d+)$`
+	cfg.RegexStaticContentString = `(?i).+\.(gif|jpg|jpeg|png|ico|flv|swf|js|css|txt|woff|ttf)`
+	cfg.ResponstimeClasses = []int{0, 500000, 10000000, 5000000, 60000000, 300000000}
+	cfg.RequestMappings = map[string]*regexp.Regexp{
+		"all": regexp.MustCompile(`([^?]*)\??.*`),
+	}
 	return cfg
 }
 
@@ -74,8 +75,8 @@ func (c *Configuration) LoadFile(configFile string) {
 	c.ZabbixServer = getStringValue(iniFile, "global", "zabbix_server", c.ZabbixServer, defaultCfg.ZabbixServer)
 	c.ZabbixHost = getStringValue(iniFile, "global", "zabbix_host", c.ZabbixHost, defaultCfg.ZabbixHost)
 
-	c.RegexLogline = getRegexValue(iniFile, "global", "regex_logline", "", defaultCfg.regexLogLineString)
-	c.RegexStaticContent = getRegexValue(iniFile, "global", "regex_static_content", "", defaultCfg.regexStaticContentString)
+	c.RegexLogLineString = getStringValue(iniFile, "global", "regex_logline", "", defaultCfg.RegexLogLineString)
+	c.RegexStaticContentString = getStringValue(iniFile, "global", "regex_static_content", "", defaultCfg.RegexStaticContentString)
 
 	for _, section := range iniFile.SectionStrings() {
 		if section == "global" || section == "DEFAULT" {
@@ -83,17 +84,6 @@ func (c *Configuration) LoadFile(configFile string) {
 		}
 		glog.Infof(">>>>>>>>>>>>>>>>>>>>> %s<<<<<<<<<<<<<<<<<<", section)
 	}
-}
-
-func getRegexValue(iniFile *ini.File, section string, key string, currentValue string, defaultValue string) regexp.Regexp {
-	if iniFile != nil && iniFile.Section(section).HasKey(key) && currentValue == defaultValue {
-		return *regexp.MustCompile(iniFile.Section(section).Key(key).MustString(defaultValue))
-	}
-	if currentValue == "" {
-		return *regexp.MustCompile(defaultValue)
-	}
-	return *regexp.MustCompile(defaultValue)
-
 }
 
 func getStringValue(iniFile *ini.File, section string, key string, currentValue string, defaultValue string) string {

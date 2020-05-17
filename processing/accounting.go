@@ -62,27 +62,25 @@ var SignalChan = make(chan os.Signal, 1)
 var sendMutex sync.Mutex
 
 // NewRequestAccounting creates a RequestAccounting instance
-func NewRequestAccounting(discoveryInterval int, sendingInterval int, timeout int) *RequestAccounting {
+func NewRequestAccounting(cfg Configuration) *RequestAccounting {
 	// RequestAccountingInst configures the accounting
 	RequestAccountingInst := RequestAccounting{
 		// a list of accounting classes, defined in microseconds
-		classes: []int{0, 500000, 10000000, 5000000, 60000000, 300000000},
+		classes: cfg.ResponstimeClasses,
 		// a map of requesttypes containing compiled regexes
-		requestMappings: map[string]*regexp.Regexp{
-			"all": regexp.MustCompile(`([^?]*)\??.*`),
-		},
+		requestMappings: cfg.RequestMappings,
 		// the current state of the statistics
 		stats: map[string]map[string]*accountingSet{},
 		zabbixConfig: zabbixConfigSetting{
-			Server:       "zabbix",
+			Server:       cfg.ZabbixServer,
 			ServerPort:   10050,
-			Host:         GetHostname(),
+			Host:         cfg.ZabbixHost,
 			DiscoveryKey: "apache.discovery",
 			BaseKey:      "apache.acc",
-			Disabled:     false,
+			Disabled:     cfg.ZabbixSendDisabled,
 		},
 	}
-	go RequestAccountingInst.consumePerfSets(discoveryInterval, sendingInterval, timeout)
+	go RequestAccountingInst.consumePerfSets(cfg.DiscoveryInterval, cfg.SendingInterval, cfg.Timeout)
 	return &RequestAccountingInst
 }
 

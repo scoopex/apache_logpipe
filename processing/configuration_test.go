@@ -5,7 +5,6 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +16,6 @@ func init() {
 
 func TestConfigurationSimple(t *testing.T) {
 	cfg := processing.NewConfiguration()
-	glog.Info(cfg.ZabbixServer)
 	cfg.ZabbixServer = "zabbix3.foo.bar"
 	assert.Equal(t, "zabbix3.foo.bar", cfg.ZabbixServer, "Commandline flag has higher precedence than default value")
 }

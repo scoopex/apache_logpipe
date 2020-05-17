@@ -15,7 +15,7 @@ func init() {
 
 func TestSimpleRequestAccounting(t *testing.T) {
 	assert := assert.New(t)
-	requestAccounting := processing.NewRequestAccounting(1, 1, 1)
+	requestAccounting := processing.NewRequestAccounting(*processing.NewConfiguration())
 	requestAccounting.DisableZabbixSender(true)
 
 	var testDatasets int = 4
@@ -39,7 +39,7 @@ func TestSimpleRequestAccounting(t *testing.T) {
 
 func TestSimpleRequestAccountingWithZabbix(t *testing.T) {
 	assert := assert.New(t)
-	requestAccounting := processing.NewRequestAccounting(1, 1, 1)
+	requestAccounting := processing.NewRequestAccounting(*processing.NewConfiguration())
 	requestAccounting.DisableZabbixSender(false)
 
 	var testDatasets int = 4
@@ -62,7 +62,8 @@ func TestSimpleRequestAccountingWithZabbix(t *testing.T) {
 
 func TestBrokenData(t *testing.T) {
 	assert := assert.New(t)
-	requestAccounting := processing.NewRequestAccounting(1, 1, 1)
+
+	requestAccounting := processing.NewRequestAccounting(*processing.NewConfiguration())
 
 	var testDataSetLoops int64 = 4
 	for t := int64(0); t < testDataSetLoops; t++ {

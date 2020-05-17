@@ -6,6 +6,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"syscall"
 	"time"
@@ -28,19 +29,22 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 	var lines int64 = 0
 	var linesNotMatched int64 = 0
 	timeStart := time.Now()
+	lineRe := regexp.MustCompile(cfg.RegexLogLineString)
+	staticContentRe := regexp.MustCompile(cfg.RegexStaticContentString)
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		lines++
 		logSink.SubmitLogLine(line)
-		match := cfg.RegexLogline.FindStringSubmatch(line)
+		match := lineRe.FindStringSubmatch(line)
 		if len(match) == 0 {
 			glog.V(1).Infof("not matched line: %s\n", line)
 			linesNotMatched++
 			continue
 		}
+		glog.Info(line)
 		result := make(map[string]string)
-		for i, name := range cfg.RegexLogline.SubexpNames() {
+		for i, name := range lineRe.SubexpNames() {
 			if i != 0 && name != "" {
 				result[name] = match[i]
 			}
@@ -54,7 +58,7 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 			linesNotMatched++
 			continue
 		}
-		matchStatic := cfg.RegexStaticContent.FindStringSubmatch(result["uri"])
+		matchStatic := staticContentRe.FindStringSubmatch(result["uri"])
 		if len(matchStatic) == 0 {
 			processing.PerfSetChan <- processing.PerfSet{
 				Domain: result["domain"],
@@ -72,7 +76,6 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 		}
 	}
 	linesAccounted := logSink.CloseLogStream()
-	//linesAccounted := <-processing.CompleteChan
 	glog.V(1).Infof("Accounted %d lines", linesAccounted)
 	if linesAccounted != lines-linesNotMatched {
 		glog.Errorf("Accounted lines are not equal to matched lines (total lines: %d, lines not matched: %d, lines accounted: %d)",
@@ -115,7 +118,7 @@ func main() {
 
 	logSink := *processing.NewLogSink(cfg.OutputLogfile, cfg.OutputLogfileSymlink)
 
-	requestAccounting := processing.NewRequestAccounting(cfg.DiscoveryInterval, cfg.SendingInterval, cfg.Timeout)
+	requestAccounting := processing.NewRequestAccounting(*cfg)
 	requestAccounting.DisableZabbixSender(cfg.ZabbixSendDisabled)
 	parseInput(logSink, *requestAccounting, *cfg)
 }
