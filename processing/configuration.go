@@ -3,6 +3,8 @@ package processing
 import (
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"gopkg.in/ini.v1"
@@ -22,6 +24,7 @@ type Configuration struct {
 	configFile               string
 	RegexLogLineString       string
 	RegexStaticContentString string
+	FractionOfSecond         int
 }
 
 // NewConfiguration create a new Configuration object
@@ -41,6 +44,7 @@ func NewConfiguration() *Configuration {
 	cfg.RequestMappings = map[string]*regexp.Regexp{
 		"all": regexp.MustCompile(`([^?]*)\??.*`),
 	}
+	cfg.FractionOfSecond = 1000000000
 	return cfg
 }
 
@@ -74,16 +78,49 @@ func (c *Configuration) LoadFile(configFile string) {
 	c.DiscoveryInterval = getIntValue(iniFile, "global", "discovery_interval", c.DiscoveryInterval, defaultCfg.DiscoveryInterval)
 	c.ZabbixServer = getStringValue(iniFile, "global", "zabbix_server", c.ZabbixServer, defaultCfg.ZabbixServer)
 	c.ZabbixHost = getStringValue(iniFile, "global", "zabbix_host", c.ZabbixHost, defaultCfg.ZabbixHost)
+	c.FractionOfSecond = getIntValue(iniFile, "global", "fraction_of_second", c.FractionOfSecond, defaultCfg.FractionOfSecond)
 
 	c.RegexLogLineString = getStringValue(iniFile, "global", "regex_logline", "", defaultCfg.RegexLogLineString)
 	c.RegexStaticContentString = getStringValue(iniFile, "global", "regex_static_content", "", defaultCfg.RegexStaticContentString)
+	c.ResponstimeClasses = getResponseTimeClasses(iniFile, "global", "request_mappings", defaultCfg.ResponstimeClasses)
+	c.RequestMappings = getRequestMappings(iniFile, defaultCfg.RequestMappings)
 
+}
+
+func getRequestMappings(iniFile *ini.File, defaultValue map[string]*regexp.Regexp) map[string]*regexp.Regexp {
+	if iniFile == nil {
+		return defaultValue
+	}
+	newRequestMappings := map[string]*regexp.Regexp{}
 	for _, section := range iniFile.SectionStrings() {
 		if section == "global" || section == "DEFAULT" {
 			continue
 		}
-		glog.Infof(">>>>>>>>>>>>>>>>>>>>> %s<<<<<<<<<<<<<<<<<<", section)
+		if iniFile.Section(section).HasKey("regex") {
+			glog.V(1).Infof("parsed request mappings from file: name: >>>%s<<<, regex >>>%s<<<", section, iniFile.Section(section).Key("regex").String())
+			newRequestMappings[section] = regexp.MustCompile(iniFile.Section(section).Key("regex").String())
+		}
 	}
+	if len(newRequestMappings) > 0 {
+		return newRequestMappings
+	}
+	return defaultValue
+}
+
+func getResponseTimeClasses(iniFile *ini.File, section string, key string, defaultValue []int) []int {
+	if iniFile != nil && iniFile.Section(section).HasKey(key) {
+		classesByString := strings.Split(iniFile.Section(section).Key(key).String(), ",")
+		classesByInteger := make([]int, 10)
+		for _, classStr := range classesByString {
+			classInt, err := strconv.Atoi(strings.TrimSpace(classStr))
+			if err != nil {
+				glog.Fatalf("unable to convert perf class  '%s' to a integer", classStr)
+			}
+			classesByInteger = append(classesByInteger, classInt)
+		}
+		return classesByInteger
+	}
+	return defaultValue
 }
 
 func getStringValue(iniFile *ini.File, section string, key string, currentValue string, defaultValue string) string {

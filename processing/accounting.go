@@ -51,6 +51,7 @@ type RequestAccounting struct {
 	stats             map[string]map[string]*accountingSet
 	zabbixConfig      zabbixConfigSetting
 	failedZabbixSends int64
+	fractionOfSecond  int
 }
 
 // CompleteChan is used to wait for accounting completion

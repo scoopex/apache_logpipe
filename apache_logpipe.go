@@ -52,7 +52,7 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 
 		code, err := strconv.Atoi(result["code"])
 		if err != nil {
-			glog.Fatalf("unable to convert code '%s' to a string", result["code"])
+			glog.Fatalf("unable to convert code '%s' to integer", result["code"])
 		}
 		if code >= 400 || code < 200 {
 			linesNotMatched++

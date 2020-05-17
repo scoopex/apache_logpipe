@@ -27,4 +27,6 @@ func TestConfigurationFile(t *testing.T) {
 	cfg.LoadFile(exampleFile)
 	assert.Equal(t, "zabbix.host.edu", cfg.ZabbixServer, "Config file has higher precedence than default value")
 	assert.Equal(t, 22, cfg.DiscoveryInterval, "Commandline flag has higher precedence than config file value")
+	assert.IsType(t, cfg.ResponstimeClasses, []int{})
+	assert.True(t, len(cfg.RequestMappings) == 2)
 }

@@ -54,7 +54,6 @@ func SetupGlogForTests() {
 	flag.StringVar(&logLevel, "logLevel", "2", "test")
 	flag.Lookup("v").Value.Set(logLevel)
 	glogReady = true
-	glog.Info("Initialized logsettings")
 }
 
 func GetProjectBaseDir() string {
