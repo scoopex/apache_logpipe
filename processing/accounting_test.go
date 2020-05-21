@@ -58,6 +58,7 @@ func TestSimpleRequestAccounting(t *testing.T) {
 	assert.Equal(accountingClasses, int64(4), "check if there are 4 lcasses")
 
 	//requestAccounting.Showstats()
+	requestAccounting.DumpAccountingData()
 }
 
 func TestSimpleRequestAccountingWithZabbix(t *testing.T) {
