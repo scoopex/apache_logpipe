@@ -86,6 +86,7 @@ func main() {
 	 */
 	var configFile string = ""
 	var showStats bool = false
+	var dumpStats bool = false
 
 	flag.StringVar(&configFile, "config", configFile, "Name of the config file")
 	flag.StringVar(&cfg.OutputLogfile, "output_logfile", cfg.OutputLogfile, "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
@@ -96,7 +97,8 @@ func main() {
 	flag.StringVar(&cfg.ZabbixServer, "zabbix_server", cfg.ZabbixServer, "The hostname of the zabbix server")
 	flag.StringVar(&cfg.ZabbixHost, "zabbix_host", cfg.ZabbixHost, "The zabbix host to report data for")
 	flag.BoolVar(&cfg.ZabbixSendDisabled, "disable_zabbix", false, "Disable zabbix sender")
-	flag.BoolVar(&showStats, "show_stats", false, "Show stats")
+	flag.BoolVar(&showStats, "show_stats_debug", false, "Show stats for debugging purposes")
+	flag.BoolVar(&dumpStats, "dump_stats", false, "Dump stats")
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()
@@ -115,5 +117,8 @@ func main() {
 	parseInput(logSink, *requestAccounting, *cfg)
 	if showStats {
 		requestAccounting.ShowStats()
+	}
+	if dumpStats {
+		requestAccounting.DumpAccountingData()
 	}
 }

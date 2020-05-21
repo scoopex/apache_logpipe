@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 	. "github.com/blacked/go-zabbix"
 	"github.com/golang/glog"
+	"github.com/olekukonko/tablewriter"
 )
 
 // PerfSetChan is used to transfer PerfPerfSet
@@ -204,6 +206,64 @@ func (c *RequestAccounting) sendData() {
 	c.sendZabbixMetrics(metrics)
 }
 
+func (c *RequestAccounting) collectCodes() []int {
+
+	codes := map[int]int{}
+	for _, vhostData := range c.stats {
+		for _, accsetData := range vhostData {
+			for code := range accsetData.codes {
+				codes[code]++
+			}
+		}
+	}
+	result := []int{}
+	for code := range codes {
+		result = append(result, code)
+	}
+
+	sort.Ints(result)
+	return result
+}
+
+// DumpAccountingData dumps the accounting data
+func (c *RequestAccounting) DumpAccountingData() {
+	sendMutex.Lock()
+	defer sendMutex.Unlock()
+
+	table := tablewriter.NewWriter(os.Stdout)
+
+	header := []string{"Domain", "PerfClass", "Count", "Average ms"}
+
+	fmt.Printf("\n")
+	for _, perfClass := range c.classes {
+		header = append(header, fmt.Sprintf(" >=\n%d\nmSec", perfClass/1000))
+	}
+	codes := c.collectCodes()
+	for _, code := range codes {
+		header = append(header, fmt.Sprintf("HTTP\n%d", code))
+	}
+	//table.SetHeader(header1)
+	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: true})
+	table.SetHeader(header)
+	table.SetHeaderAlignment(tablewriter.ALIGN_RIGHT)
+	table.SetAutoFormatHeaders(false)
+	for vhost, vhostData := range c.stats {
+		for accset, accsetData := range vhostData {
+			averageTime := float64(accsetData.sum) / float64(accsetData.count)
+			row := []string{vhost, accset, strconv.FormatInt(accsetData.count, 10), fmt.Sprintf("%.03f", averageTime)}
+			for class := range c.classes {
+				row = append(row, strconv.FormatInt(accsetData.classes[class], 10))
+			}
+
+			for code := range codes {
+				row = append(row, strconv.FormatInt(accsetData.codes[code], 10))
+			}
+			table.Append(row)
+		}
+	}
+	table.Render()
+}
+
 // CompleteStream finishes processing
 func CompleteStream() {
 	PerfSetChan <- PerfSet{
@@ -318,7 +378,7 @@ func (c *RequestAccounting) ShowStats() {
 	Debugit(false, "current statistics", c.stats)
 }
 
-// GetGetStatistics for testcasess
+// GetStatistics for Testcasess
 func (c *RequestAccounting) GetStatistics() (int64, int64) {
 	var vhosts int64 = 0
 	var accountedClasses int64 = 0
