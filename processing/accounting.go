@@ -46,12 +46,13 @@ type zabbixConfigSetting struct {
 
 // RequestAccounting account requests delivered by PerfSetChan
 type RequestAccounting struct {
-	classes           []int
-	requestMappings   map[string]*regexp.Regexp
-	stats             map[string]map[string]*accountingSet
-	zabbixConfig      zabbixConfigSetting
-	failedZabbixSends int64
-	fractionOfSecond  int
+	classes            []int
+	requestMappings    map[string]*regexp.Regexp
+	regexStaticContent *regexp.Regexp
+	stats              map[string]map[string]*accountingSet
+	zabbixConfig       zabbixConfigSetting
+	failedZabbixSends  int64
+	fractionOfSecond   int
 }
 
 // CompleteChan is used to wait for accounting completion
@@ -69,7 +70,8 @@ func NewRequestAccounting(cfg Configuration) *RequestAccounting {
 		// a list of accounting classes, defined in microseconds
 		classes: cfg.ResponstimeClasses,
 		// a map of requesttypes containing compiled regexes
-		requestMappings: cfg.RequestMappings,
+		requestMappings:    cfg.RequestMappings,
+		regexStaticContent: regexp.MustCompile(cfg.RegexStaticContentString),
 		// the current state of the statistics
 		stats: map[string]map[string]*accountingSet{},
 		zabbixConfig: zabbixConfigSetting{
@@ -113,6 +115,10 @@ func (c *RequestAccounting) getPerfclass(responsetime int) int {
 func (c *RequestAccounting) sendDiscovery() {
 	sendMutex.Lock()
 	defer sendMutex.Unlock()
+	if c.zabbixConfig.Disabled {
+		glog.V(1).Info("Zabbix sender disabled, not sending data")
+		return
+	}
 	glog.Info("Sending discovery")
 
 	var discoveryDataArray []map[string]string
@@ -159,6 +165,10 @@ func (c *RequestAccounting) createZabbixMetric(dataTime int64, value string, key
 func (c *RequestAccounting) sendData() {
 	sendMutex.Lock()
 	defer sendMutex.Unlock()
+	if c.zabbixConfig.Disabled {
+		glog.V(1).Info("Zabbix sender disabled, not sending data")
+		return
+	}
 	glog.Info("Sending data")
 	var metrics []*Metric
 
@@ -215,7 +225,6 @@ func (c *RequestAccounting) consumePerfSets(discoveryIntervalSeconds int, sendin
 		case signal := <-SignalChan:
 			{
 				glog.Infof("got %s signal, terminating myself now", signal)
-				c.Showstats()
 				c.sendDiscovery()
 				c.sendData()
 				os.Exit(1)
@@ -260,6 +269,28 @@ func (c *RequestAccounting) SubmitData() {
 	c.sendData()
 }
 
+func (c *RequestAccounting) addAccounting(domain string, ident string, responsetime int, code int) bool {
+	if c.stats[domain] == nil {
+		c.stats[domain] = make(map[string]*accountingSet)
+	}
+	if c.stats[domain][ident] == nil {
+		c.stats[domain][ident] = &accountingSet{
+			count:   0,
+			sum:     0,
+			codes:   make(map[int]int64),
+			classes: make(map[int]int64),
+		}
+		for _, perfclass := range c.classes {
+			c.stats[domain][ident].classes[perfclass] = 0
+		}
+	}
+	c.stats[domain][ident].sum += int64(responsetime)
+	c.stats[domain][ident].count++
+	c.stats[domain][ident].codes[code]++
+	c.stats[domain][ident].classes[c.getPerfclass(responsetime)]++
+	return true
+}
+
 // AccountRequest accounts the request :-)
 func (c *RequestAccounting) AccountRequest(domain string, uri string, time string, code int) bool {
 	responsetime, err := strconv.Atoi(time)
@@ -267,34 +298,35 @@ func (c *RequestAccounting) AccountRequest(domain string, uri string, time strin
 		glog.Infof("unable to convert time '%s' to a string", time)
 		return false
 	}
-
+	matchStatic := c.regexStaticContent.FindStringSubmatch(uri)
+	if len(matchStatic) != 0 {
+		c.addAccounting(domain, "NOT MATCHED", responsetime, code)
+		return true
+	}
 	for name, reName := range c.requestMappings {
 		match := reName.FindStringSubmatch(uri)
 		if len(match) == 0 {
 			continue
 		}
-		if (c.stats[domain] == nil) || (c.stats[domain][name] == nil) {
-			c.stats[domain] = make(map[string]*accountingSet)
-			c.stats[domain][name] = &accountingSet{
-				count:   0,
-				sum:     0,
-				codes:   make(map[int]int64),
-				classes: make(map[int]int64),
-			}
-			for _, perfclass := range c.classes {
-				c.stats[domain][name].classes[perfclass] = 0
-			}
-		}
-
-		c.stats[domain][name].sum += int64(responsetime)
-		c.stats[domain][name].count++
-		c.stats[domain][name].codes[code]++
-		c.stats[domain][name].classes[c.getPerfclass(responsetime)]++
+		c.addAccounting(domain, name, responsetime, code)
 	}
 	return true
 }
 
-// Showstats displays the statistics
-func (c *RequestAccounting) Showstats() {
+// ShowStats displays the statistics
+func (c *RequestAccounting) ShowStats() {
 	Debugit(false, "current statistics", c.stats)
+}
+
+// GetGetStatistics for testcasess
+func (c *RequestAccounting) GetStatistics() (int64, int64) {
+	var vhosts int64 = 0
+	var accountedClasses int64 = 0
+	for _, vhostData := range c.stats {
+		vhosts++
+		for range vhostData {
+			accountedClasses++
+		}
+	}
+	return vhosts, accountedClasses
 }

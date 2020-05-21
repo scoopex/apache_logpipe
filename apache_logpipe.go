@@ -30,7 +30,6 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 	var linesNotMatched int64 = 0
 	timeStart := time.Now()
 	lineRe := regexp.MustCompile(cfg.RegexLogLineString)
-	staticContentRe := regexp.MustCompile(cfg.RegexStaticContentString)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -42,7 +41,6 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 			linesNotMatched++
 			continue
 		}
-		glog.Info(line)
 		result := make(map[string]string)
 		for i, name := range lineRe.SubexpNames() {
 			if i != 0 && name != "" {
@@ -58,21 +56,12 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 			linesNotMatched++
 			continue
 		}
-		matchStatic := staticContentRe.FindStringSubmatch(result["uri"])
-		if len(matchStatic) == 0 {
-			processing.PerfSetChan <- processing.PerfSet{
-				Domain: result["domain"],
-				Ident:  result["uri"],
-				Time:   result["time"],
-				Code:   code,
-			}
-		} else {
-			processing.PerfSetChan <- processing.PerfSet{
-				Domain: result["domain"],
-				Ident:  "NOT MATCHED",
-				Time:   result["time"],
-				Code:   code,
-			}
+
+		processing.PerfSetChan <- processing.PerfSet{
+			Domain: result["domain"],
+			Ident:  result["uri"],
+			Time:   result["time"],
+			Code:   code,
 		}
 	}
 	linesAccounted := logSink.CloseLogStream()
@@ -86,7 +75,6 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 	linesPerSecond := float64(lines) / (float64(elapsed) / 1000000000)
 	percentageNotMatched := (float64(linesNotMatched) / float64(lines)) * 100
 	glog.Infof("Processed %d lines in %s, %f lines per second, %d lines not matched (%0.2f%%)\n", lines, elapsed, linesPerSecond, linesNotMatched, percentageNotMatched)
-	requestAccounting.Showstats()
 }
 
 func main() {
@@ -96,15 +84,19 @@ func main() {
 	/*
 	* Parsing the arguments
 	 */
-	configFile := *flag.String("config", "", "Name of the config file")
-	cfg.OutputLogfile = *flag.String("output_logfile", cfg.OutputLogfile, "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
-	cfg.OutputLogfileSymlink = *flag.String("symlink", cfg.OutputLogfileSymlink, "A symlink which points to the current logfile")
-	cfg.SendingInterval = *flag.Int("sending_interval", cfg.SendingInterval, "Sending interval in seconds")
-	cfg.Timeout = *flag.Int("timeout", cfg.Timeout, "timeout in seconds (default: 5 seconds)")
-	cfg.DiscoveryInterval = *flag.Int("discovery_interval", cfg.DiscoveryInterval, "Discovery interval in seconds")
-	cfg.ZabbixServer = *flag.String("zabbix_server", cfg.ZabbixServer, "The hostname of the zabbix server")
-	cfg.ZabbixHost = *flag.String("zabbix_host", cfg.ZabbixHost, "The zabbix host to report data for")
-	cfg.ZabbixSendDisabled = *flag.Bool("disable_zabbix", cfg.ZabbixSendDisabled, "Disable zabbix sender")
+	var configFile string = ""
+	var showStats bool = false
+
+	flag.StringVar(&configFile, "config", configFile, "Name of the config file")
+	flag.StringVar(&cfg.OutputLogfile, "output_logfile", cfg.OutputLogfile, "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
+	flag.StringVar(&cfg.OutputLogfileSymlink, "symlink", cfg.OutputLogfileSymlink, "A symlink which points to the current logfile")
+	flag.IntVar(&cfg.SendingInterval, "sending_interval", cfg.SendingInterval, "Sending interval in seconds")
+	flag.IntVar(&cfg.Timeout, "timeout", cfg.Timeout, "timeout in seconds (default: 5 seconds)")
+	flag.IntVar(&cfg.DiscoveryInterval, "discovery_interval", cfg.DiscoveryInterval, "Discovery interval in seconds")
+	flag.StringVar(&cfg.ZabbixServer, "zabbix_server", cfg.ZabbixServer, "The hostname of the zabbix server")
+	flag.StringVar(&cfg.ZabbixHost, "zabbix_host", cfg.ZabbixHost, "The zabbix host to report data for")
+	flag.BoolVar(&cfg.ZabbixSendDisabled, "disable_zabbix", false, "Disable zabbix sender")
+	flag.BoolVar(&showStats, "show_stats", false, "Show stats")
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()
@@ -121,4 +113,7 @@ func main() {
 	requestAccounting := processing.NewRequestAccounting(*cfg)
 	requestAccounting.DisableZabbixSender(cfg.ZabbixSendDisabled)
 	parseInput(logSink, *requestAccounting, *cfg)
+	if showStats {
+		requestAccounting.ShowStats()
+	}
 }

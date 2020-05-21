@@ -16,4 +16,5 @@
 # vendor/
 apache_logpipe
 cover.out
+testdata/*
 /.project

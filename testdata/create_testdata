@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+DIR="$(dirname $(readlink -f $0))"
+
+if [ -f "$DIR/test_access_log_huge" ];then
+  echo "testdata $DIR/test_access_log_huge alredy exists"
+  exit 0
+fi
+echo "creating testdata $DIR/test_access_log_huge"
+(
+for i in `seq 1 10000`
+do
+   cat $DIR/test_access_log
+done
+) > $DIR/test_access_log_huge
