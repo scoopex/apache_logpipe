@@ -67,7 +67,7 @@ func parseInput(logSink processing.LogSink, requestAccounting processing.Request
 	linesAccounted := logSink.CloseLogStream()
 	glog.V(1).Infof("Accounted %d lines", linesAccounted)
 	if linesAccounted != lines-linesNotMatched {
-		glog.Errorf("Accounted lines are not equal to matched lines (total lines: %d, lines not matched: %d, lines accounted: %d)",
+		glog.Errorf("Accounted lines are not equal to matched lines (total lines: %d, lines not matched: %d ( 200 < http code, http code  >=400), lines accounted: %d)",
 			lines, linesNotMatched, linesAccounted)
 	}
 

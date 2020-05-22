@@ -1,7 +1,11 @@
+all: run runlong release
+
 run:
+	go run apache_logpipe.go -v=1 -disable_zabbix -stderrthreshold=INFO -show_stats_debug -dump_stats --< testdata/test_access_log
+
+runlong:
 	testdata/create_testdata
-	go run apache_logpipe.go -v=1 -disable_zabbix -stderrthreshold=INFO --< testdata/test_access_log
-	go run apache_logpipe.go -disable_zabbix --< testdata/test_access_log_huge
+	go run apache_logpipe.go -disable_zabbix -show_stats_debug -dump_stats --< testdata/test_access_log_huge
 
 test:
 	go get -d ./...
