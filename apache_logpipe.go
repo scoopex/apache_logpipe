@@ -3,7 +3,7 @@ package main
 import (
 	"apache_logpipe/processing"
 	"bufio"
-	"flag"
+	goflag "flag"
 	"os"
 	"os/signal"
 	"regexp"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 )
 
 var helpFlag bool
@@ -87,6 +88,7 @@ func main() {
 	var configFile string = ""
 	var showStats bool = false
 	var dumpStats bool = false
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 
 	flag.StringVar(&configFile, "config", configFile, "Name of the config file")
 	flag.StringVar(&cfg.OutputLogfile, "output_logfile", cfg.OutputLogfile, "Filename with timestamp, i.e. '/var/log/apache2/access.log.%Y-%m-%d'")
@@ -99,9 +101,11 @@ func main() {
 	flag.BoolVar(&cfg.ZabbixSendDisabled, "disable_zabbix", false, "Disable zabbix sender")
 	flag.BoolVar(&showStats, "show_stats_debug", false, "Show stats for debugging purposes")
 	flag.BoolVar(&dumpStats, "dump_stats", false, "Dump stats")
+	goflag.Set("logtostderr", "true")
 
-	flag.Set("logtostderr", "true")
 	flag.Parse()
+	flag.CommandLine.SortFlags = false
+
 	cfg.LoadFile(configFile)
 
 	glog.Infof("Starting apache_logpipe: output_logfile: %s, sending_interval: %d, discovery_interval: %d, zabbix_server: %s, zabbix_host: %s\n",
