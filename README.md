@@ -42,20 +42,18 @@ https://www.alexedwards.net/blog/an-overview-of-go-tooling
 TODOs and Ideas:
 ----------------
 
-
-- Refactor to more object oriented and unaderstandable code
-- Make the code more modular/structured 
-- Write unittests
-  - https://github.com/golang/mock
-  - https://blog.codecentric.de/2019/07/gomock-vs-testify/
-- Write documentation
+- write zipped logfiles
+- Add a simple webserver which provides configuring intefaces/statistics
 - Add configuration file
-- Add a simple webserver which provides a statistics overview 
 - Understand go dependency management
+- Make the code more modular/structured 
+- Write documentation
 
 DONE:
 -----
 
+- Refactor to more object oriented and unaderstandable code
+- Output statistics
 - Make logfile implementation threadsafe
   (this is not neccessary in general, but interesting from academic view)
 - Maintain a "current" link for the logfile
@@ -70,6 +68,9 @@ DONE:
 - Calculate statistics
 - Add option parser
 - Write logfile
+- Write unittests
+  - https://github.com/golang/mock
+  - https://blog.codecentric.de/2019/07/gomock-vs-testify/
 
 
 Installation an usage
@@ -83,7 +84,7 @@ Installation an usage
 * Add this directive to your /etc/apache2.conf or apache vhost config
   ```
   LogFormat "%h %v:%p %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\" %D" 
-  CustomLog "|/usr/local/bin -zabbix_server zabbix.mydomain.org -output_logfile '/var/log/apache2/access.log.%Y-%m-%d" vhost_combined_canonical
+  CustomLog "|/usr/local/bin --zabbix_server zabbix.mydomain.org --output_logfile '/var/log/apache2/access.log.%Y-%m-%d" vhost_combined_canonical
   ```
 * Restart Apache
   ```
