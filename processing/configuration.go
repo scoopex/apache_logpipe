@@ -25,6 +25,10 @@ type Configuration struct {
 	RegexLogLineString       string
 	RegexStaticContentString string
 	FractionOfSecond         int
+	WebInterfaceListen       string
+	WebInterfaceEnable       bool
+	WebInterfaceUser         string
+	WebInterfacePassword     string
 }
 
 // NewConfiguration create a new Configuration object
@@ -45,6 +49,10 @@ func NewConfiguration() *Configuration {
 		"all": regexp.MustCompile(`([^?]*)\??.*`),
 	}
 	cfg.FractionOfSecond = 1000000000
+	cfg.WebInterfaceListen = "127.0.0.1:10080"
+	cfg.WebInterfaceUser = "admin"
+	cfg.WebInterfacePassword = "admin"
+	cfg.WebInterfaceEnable = true
 	return cfg
 }
 

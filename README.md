@@ -42,9 +42,8 @@ https://www.alexedwards.net/blog/an-overview-of-go-tooling
 TODOs and Ideas:
 ----------------
 
-- write zipped logfiles
+- write zipped logfiles (https://gist.github.com/mchirico/6147687)
 - Add a simple webserver which provides configuring intefaces/statistics
-- Add configuration file
 - Understand go dependency management
 - Make the code more modular/structured 
 - Write documentation
@@ -52,9 +51,10 @@ TODOs and Ideas:
 DONE:
 -----
 
+- Add configuration file
 - Refactor to more object oriented and unaderstandable code
 - Output statistics
-- Make logfile implementation threadsafe
+- Make logstream implementation threadsafe
   (this is not neccessary in general, but interesting from academic view)
 - Maintain a "current" link for the logfile
 - Add a signal handler which closes logfile and output statistics

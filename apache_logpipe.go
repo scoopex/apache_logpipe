@@ -118,6 +118,12 @@ func main() {
 
 	requestAccounting := processing.NewRequestAccounting(*cfg)
 	requestAccounting.DisableZabbixSender(cfg.ZabbixSendDisabled)
+
+	if cfg.WebInterfaceEnable == true {
+		wi := processing.NewWebInterface(*cfg)
+		go wi.ServeRequests()
+	}
+
 	parseInput(logSink, *requestAccounting, *cfg)
 	if showStats {
 		requestAccounting.ShowStats()
