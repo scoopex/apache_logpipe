@@ -29,12 +29,12 @@ type PerfSet struct {
 
 // accountingSet for a certain request type
 type accountingSet struct {
-	count     int64
+	Count     int64
 	lastCount int64
-	sum       int64
+	Sum       int64
 	lastSum   int64
-	codes     map[int]int64
-	classes   map[int]int64
+	Codes     map[int]int64
+	Classes   map[int]int64
 }
 
 type zabbixConfigSetting struct {
@@ -178,27 +178,27 @@ func (c *RequestAccounting) sendData() {
 
 	for vhost, vhostData := range c.stats {
 		for accset, accsetData := range vhostData {
-			metrics = append(metrics, c.createZabbixMetric(dataTime, strconv.FormatInt(accsetData.count, 10), vhost, accset, "count"))
-			metrics = append(metrics, c.createZabbixMetric(dataTime, strconv.FormatInt(accsetData.sum, 10), vhost, accset, "sum"))
+			metrics = append(metrics, c.createZabbixMetric(dataTime, strconv.FormatInt(accsetData.Count, 10), vhost, accset, "count"))
+			metrics = append(metrics, c.createZabbixMetric(dataTime, strconv.FormatInt(accsetData.Sum, 10), vhost, accset, "sum"))
 
 			/*
 			 * Calculate differential statistics
 			 */
-			requestsProcessed := accsetData.count - accsetData.lastCount
-			timeTaken := accsetData.sum - accsetData.lastSum
+			requestsProcessed := accsetData.Count - accsetData.lastCount
+			timeTaken := accsetData.Sum - accsetData.lastSum
 			var requestsPerSecond string = "0"
 			if requestsProcessed > 0 {
 				requestsPerSecond = fmt.Sprintf("%f", float64(timeTaken/requestsProcessed))
 			}
-			accsetData.lastCount = accsetData.count
-			accsetData.lastSum = accsetData.sum
+			accsetData.lastCount = accsetData.Count
+			accsetData.lastSum = accsetData.Sum
 			metrics = append(metrics, c.createZabbixMetric(dataTime, requestsPerSecond, vhost, accset, "req_s"))
 
-			for class, count := range accsetData.classes {
+			for class, count := range accsetData.Classes {
 				metrics = append(metrics, c.createZabbixMetric(dataTime, strconv.FormatInt(count, 10), vhost, accset, "class", fmt.Sprintf("%d", class)))
 			}
 
-			for code, count := range accsetData.codes {
+			for code, count := range accsetData.Codes {
 				metrics = append(metrics, c.createZabbixMetric(dataTime, strconv.FormatInt(count, 10), vhost, accset, "code", fmt.Sprintf("%d", code)))
 			}
 		}
@@ -211,7 +211,7 @@ func (c *RequestAccounting) collectCodes() []int {
 	codes := map[int]int{}
 	for _, vhostData := range c.stats {
 		for _, accsetData := range vhostData {
-			for code := range accsetData.codes {
+			for code := range accsetData.Codes {
 				codes[code]++
 			}
 		}
@@ -249,14 +249,14 @@ func (c *RequestAccounting) DumpAccountingData() {
 	table.SetAutoFormatHeaders(false)
 	for vhost, vhostData := range c.stats {
 		for accset, accsetData := range vhostData {
-			averageTime := float64(accsetData.sum) / float64(accsetData.count)
-			row := []string{vhost, accset, strconv.FormatInt(accsetData.count, 10), fmt.Sprintf("%.03f", averageTime)}
+			averageTime := float64(accsetData.Sum) / float64(accsetData.Count)
+			row := []string{vhost, accset, strconv.FormatInt(accsetData.Count, 10), fmt.Sprintf("%.03f", averageTime)}
 			for class := range c.classes {
-				row = append(row, strconv.FormatInt(accsetData.classes[class], 10))
+				row = append(row, strconv.FormatInt(accsetData.Classes[class], 10))
 			}
 
 			for code := range codes {
-				row = append(row, strconv.FormatInt(accsetData.codes[code], 10))
+				row = append(row, strconv.FormatInt(accsetData.Codes[code], 10))
 			}
 			table.Append(row)
 		}
@@ -335,19 +335,19 @@ func (c *RequestAccounting) addAccounting(domain string, ident string, responset
 	}
 	if c.stats[domain][ident] == nil {
 		c.stats[domain][ident] = &accountingSet{
-			count:   0,
-			sum:     0,
-			codes:   make(map[int]int64),
-			classes: make(map[int]int64),
+			Count:   0,
+			Sum:     0,
+			Codes:   make(map[int]int64),
+			Classes: make(map[int]int64),
 		}
 		for _, perfclass := range c.classes {
-			c.stats[domain][ident].classes[perfclass] = 0
+			c.stats[domain][ident].Classes[perfclass] = 0
 		}
 	}
-	c.stats[domain][ident].sum += int64(responsetime)
-	c.stats[domain][ident].count++
-	c.stats[domain][ident].codes[code]++
-	c.stats[domain][ident].classes[c.getPerfclass(responsetime)]++
+	c.stats[domain][ident].Sum += int64(responsetime)
+	c.stats[domain][ident].Count++
+	c.stats[domain][ident].Codes[code]++
+	c.stats[domain][ident].Classes[c.getPerfclass(responsetime)]++
 	return true
 }
 
@@ -376,6 +376,16 @@ func (c *RequestAccounting) AccountRequest(domain string, uri string, time strin
 // ShowStats displays the statistics
 func (c *RequestAccounting) ShowStats() {
 	Debugit(false, "current statistics", c.stats)
+}
+
+// ShowStats displays the statistics
+func (c *RequestAccounting) GetJsonStats() string {
+
+	jsonString, err := json.MarshalIndent(c.stats, "", " ")
+	if err != nil {
+		glog.Fatalf("unable to marshal json stats data: %s", err.Error())
+	}
+	return string(jsonString)
 }
 
 // GetStatistics for Testcasess

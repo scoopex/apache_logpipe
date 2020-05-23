@@ -120,7 +120,7 @@ func main() {
 	requestAccounting.DisableZabbixSender(cfg.ZabbixSendDisabled)
 
 	if cfg.WebInterfaceEnable == true {
-		wi := processing.NewWebInterface(*cfg)
+		wi := processing.NewWebInterface(*cfg, *requestAccounting)
 		go wi.ServeRequests()
 	}
 
