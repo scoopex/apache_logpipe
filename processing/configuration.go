@@ -52,7 +52,7 @@ func NewConfiguration() *Configuration {
 	cfg.WebInterfaceListen = "127.0.0.1:10080"
 	cfg.WebInterfaceUser = "admin"
 	cfg.WebInterfacePassword = "admin"
-	cfg.WebInterfaceEnable = true
+	cfg.WebInterfaceEnable = false
 	return cfg
 }
 
