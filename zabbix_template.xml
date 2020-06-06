@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zabbix_export>
+    <version>4.4</version>
+    <date>2020-04-13T13:57:39Z</date>
+    <groups>
+        <group>
+            <name>Templates</name>
+        </group>
+    </groups>
+    <templates>
+        <template>
+            <template>Custom - Service - Apache Proxy</template>
+            <name>Custom - Service - Apache Proxy</name>
+            <groups>
+                <group>
+                    <name>Templates</name>
+                </group>
+            </groups>
+            <applications>
+                <application>
+                    <name>Custom - Service - Apache Proxy - General</name>
+                </application>
+                <application>
+                    <name>Custom - Service - Apache Proxy - Sites</name>
+                </application>
+            </applications>
+            <items>
+                <item>
+                    <name>Hosts in Maintenance</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>apache.maintenance.hosts</key>
+                    <delay>90s</delay>
+                    <history>30d</history>
+                    <trends>0</trends>
+                    <units>vhosts</units>
+                    <applications>
+                        <application>
+                            <name>Custom - Service - Apache Proxy - General</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                    <triggers>
+                        <trigger>
+                            <expression>{last()}&gt;0</expression>
+                            <name>{ITEM.LASTVALUE1}  in maintenance</name>
+                            <priority>WARNING</priority>
+                            <dependencies>
+                                <dependency>
+                                    <name>{ITEM.LASTVALUE1}  in maintenance for more than one hour</name>
+                                    <expression>{Custom - Service - Apache Proxy:apache.maintenance.hosts.min(3600)}&gt;0</expression>
+                                </dependency>
+                            </dependencies>
+                        </trigger>
+                        <trigger>
+                            <expression>{min(3600)}&gt;0</expression>
+                            <name>{ITEM.LASTVALUE1}  in maintenance for more than one hour</name>
+                            <priority>AVERAGE</priority>
+                        </trigger>
+                    </triggers>
+                </item>
+            </items>
+            <discovery_rules>
+                <discovery_rule>
+                    <name>Proxy Virtualhosts</name>
+                    <type>TRAP</type>
+                    <key>apache.logpipe.discovery</key>
+                    <delay>0</delay>
+                    <lifetime>3d</lifetime>
+                    <item_prototypes>
+                        <item_prototype>
+                            <name>{#VHOST} ALL: 0-500ms in %</name>
+                            <type>TRAP</type>
+                            <key>apache.logpipe[{#VHOST},all,0]</key>
+                            <delay>0</delay>
+                            <history>14d</history>
+                            <trends>90d</trends>
+                            <value_type>FLOAT</value_type>
+                            <units>%</units>
+                            <applications>
+                                <application>
+                                    <name>Custom - Service - Apache Proxy - Sites</name>
+                                </application>
+                            </applications>
+                            <request_method>POST</request_method>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>{#VHOST} ALL: 500ms-5s in %</name>
+                            <type>TRAP</type>
+                            <key>apache.logpipe[{#VHOST},all,500000]</key>
+                            <delay>0</delay>
+                            <history>14d</history>
+                            <trends>90d</trends>
+                            <value_type>FLOAT</value_type>
+                            <units>%</units>
+                            <applications>
+                                <application>
+                                    <name>Custom - Service - Apache Proxy - Sites</name>
+                                </application>
+                            </applications>
+                            <request_method>POST</request_method>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>{#VHOST} ALL: 5s-10s in %</name>
+                            <type>TRAP</type>
+                            <key>apache.logpipe[{#VHOST},all,5000000]</key>
+                            <delay>0</delay>
+                            <history>14d</history>
+                            <trends>90d</trends>
+                            <value_type>FLOAT</value_type>
+                            <units>%</units>
+                            <applications>
+                                <application>
+                                    <name>Custom - Service - Apache Proxy - Sites</name>
+                                </application>
+                            </applications>
+                            <request_method>POST</request_method>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>{#VHOST} ALL: 10s-60s in %</name>
+                            <type>TRAP</type>
+                            <key>apache.logpipe[{#VHOST},all,10000000]</key>
+                            <delay>0</delay>
+                            <history>14d</history>
+                            <trends>90d</trends>
+                            <value_type>FLOAT</value_type>
+                            <units>%</units>
+                            <applications>
+                                <application>
+                                    <name>Custom - Service - Apache Proxy - Sites</name>
+                                </application>
+                            </applications>
+                            <request_method>POST</request_method>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>{#VHOST} ALL: 60s-300s in %</name>
+                            <type>TRAP</type>
+                            <key>apache.logpipe[{#VHOST},all,300000000]</key>
+                            <delay>0</delay>
+                            <history>14d</history>
+                            <trends>90d</trends>
+                            <value_type>FLOAT</value_type>
+                            <units>%</units>
+                            <applications>
+                                <application>
+                                    <name>Custom - Service - Apache Proxy - Sites</name>
+                                </application>
+                            </applications>
+                            <request_method>POST</request_method>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>{#VHOST} ALL: Average Request Time</name>
+                            <type>TRAP</type>
+                            <key>apache.logpipe[{#VHOST},all,avg]</key>
+                            <delay>0</delay>
+                            <history>14d</history>
+                            <trends>90d</trends>
+                            <value_type>FLOAT</value_type>
+                            <units>s</units>
+                            <applications>
+                                <application>
+                                    <name>Custom - Service - Apache Proxy - Sites</name>
+                                </application>
+                            </applications>
+                            <preprocessing>
+                                <step>
+                                    <type>MULTIPLIER</type>
+                                    <params>0.001</params>
+                                </step>
+                            </preprocessing>
+                            <request_method>POST</request_method>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>{#VHOST} ALL: Number of Requests</name>
+                            <type>TRAP</type>
+                            <key>apache.logpipe[{#VHOST},all,count]</key>
+                            <delay>0</delay>
+                            <history>14d</history>
+                            <trends>90d</trends>
+                            <units>req</units>
+                            <applications>
+                                <application>
+                                    <name>Custom - Service - Apache Proxy - Sites</name>
+                                </application>
+                            </applications>
+                            <request_method>POST</request_method>
+                        </item_prototype>
+                    </item_prototypes>
+                    <graph_prototypes>
+                        <graph_prototype>
+                            <name>{#VHOST} Request Distribution</name>
+                            <height>300</height>
+                            <type>STACKED</type>
+                            <ymin_type_1>FIXED</ymin_type_1>
+                            <graph_items>
+                                <graph_item>
+                                    <color>33CC33</color>
+                                    <item>
+                                        <host>Custom - Service - Apache Proxy</host>
+                                        <key>apache.logpipe[{#VHOST},all,0]</key>
+                                    </item>
+                                </graph_item>
+                                <graph_item>
+                                    <sortorder>1</sortorder>
+                                    <color>99FF66</color>
+                                    <item>
+                                        <host>Custom - Service - Apache Proxy</host>
+                                        <key>apache.logpipe[{#VHOST},all,500000]</key>
+                                    </item>
+                                </graph_item>
+                                <graph_item>
+                                    <sortorder>2</sortorder>
+                                    <color>FFFF66</color>
+                                    <item>
+                                        <host>Custom - Service - Apache Proxy</host>
+                                        <key>apache.logpipe[{#VHOST},all,5000000]</key>
+                                    </item>
+                                </graph_item>
+                                <graph_item>
+                                    <sortorder>3</sortorder>
+                                    <color>FF9933</color>
+                                    <item>
+                                        <host>Custom - Service - Apache Proxy</host>
+                                        <key>apache.logpipe[{#VHOST},all,10000000]</key>
+                                    </item>
+                                </graph_item>
+                                <graph_item>
+                                    <sortorder>4</sortorder>
+                                    <color>FF0000</color>
+                                    <item>
+                                        <host>Custom - Service - Apache Proxy</host>
+                                        <key>apache.logpipe[{#VHOST},all,300000000]</key>
+                                    </item>
+                                </graph_item>
+                            </graph_items>
+                        </graph_prototype>
+                        <graph_prototype>
+                            <name>{#VHOST} Requests</name>
+                            <height>300</height>
+                            <ymin_type_1>FIXED</ymin_type_1>
+                            <graph_items>
+                                <graph_item>
+                                    <drawtype>GRADIENT_LINE</drawtype>
+                                    <color>1A7C11</color>
+                                    <yaxisside>RIGHT</yaxisside>
+                                    <calc_fnc>ALL</calc_fnc>
+                                    <item>
+                                        <host>Custom - Service - Apache Proxy</host>
+                                        <key>apache.logpipe[{#VHOST},all,avg]</key>
+                                    </item>
+                                </graph_item>
+                                <graph_item>
+                                    <sortorder>1</sortorder>
+                                    <drawtype>DASHED_LINE</drawtype>
+                                    <color>F63100</color>
+                                    <calc_fnc>ALL</calc_fnc>
+                                    <item>
+                                        <host>Custom - Service - Apache Proxy</host>
+                                        <key>apache.logpipe[{#VHOST},all,count]</key>
+                                    </item>
+                                </graph_item>
+                            </graph_items>
+                        </graph_prototype>
+                    </graph_prototypes>
+                    <request_method>POST</request_method>
+                </discovery_rule>
+            </discovery_rules>
+            <screens>
+                <screen>
+                    <name>Custom - Service - Station Proxy</name>
+                    <hsize>2</hsize>
+                    <vsize>1</vsize>
+                    <screen_items>
+                        <screen_item>
+                            <resourcetype>20</resourcetype>
+                            <style>0</style>
+                            <resource>
+                                <name>{#VHOST} Requests</name>
+                                <host>Custom - Service - Apache Proxy</host>
+                            </resource>
+                            <width>600</width>
+                            <height>375</height>
+                            <x>0</x>
+                            <y>0</y>
+                            <colspan>1</colspan>
+                            <rowspan>1</rowspan>
+                            <elements>0</elements>
+                            <valign>1</valign>
+                            <halign>0</halign>
+                            <dynamic>0</dynamic>
+                            <sort_triggers>0</sort_triggers>
+                            <url/>
+                            <application/>
+                            <max_columns>1</max_columns>
+                        </screen_item>
+                        <screen_item>
+                            <resourcetype>20</resourcetype>
+                            <style>0</style>
+                            <resource>
+                                <name>{#VHOST} Request Distribution</name>
+                                <host>Custom - Service - Apache Proxy</host>
+                            </resource>
+                            <width>600</width>
+                            <height>330</height>
+                            <x>1</x>
+                            <y>0</y>
+                            <colspan>1</colspan>
+                            <rowspan>1</rowspan>
+                            <elements>0</elements>
+                            <valign>1</valign>
+                            <halign>0</halign>
+                            <dynamic>0</dynamic>
+                            <sort_triggers>0</sort_triggers>
+                            <url/>
+                            <application/>
+                            <max_columns>1</max_columns>
+                        </screen_item>
+                    </screen_items>
+                </screen>
+            </screens>
+        </template>
+    </templates>
+</zabbix_export>
