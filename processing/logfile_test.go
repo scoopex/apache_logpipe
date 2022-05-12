@@ -1,7 +1,7 @@
 package processing_test
 
 import (
-	"apache_logpipe/processing"
+	"256bit.org/apache_logpipe/processing"
 	"fmt"
 	"math/rand"
 	"os"
