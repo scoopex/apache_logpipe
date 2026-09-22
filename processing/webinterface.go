@@ -28,7 +28,7 @@ func NewWebInterface(cfg Configuration, data RequestAccounting) *WebInterface {
 }
 
 func (c *WebInterface) getStatus(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, c.data.GetJsonStats())
+	fmt.Fprintf(w, "%s", c.data.GetJsonStats())
 }
 
 // ServeRequests start the serving of requests

@@ -242,11 +242,7 @@ func (c *RequestAccounting) DumpAccountingData() {
 	for _, code := range codes {
 		header = append(header, fmt.Sprintf("HTTP\n%d", code))
 	}
-	//table.SetHeader(header1)
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: true})
-	table.SetHeader(header)
-	table.SetHeaderAlignment(tablewriter.ALIGN_RIGHT)
-	table.SetAutoFormatHeaders(false)
+
 	for vhost, vhostData := range c.stats {
 		for accset, accsetData := range vhostData {
 			averageTime := float64(accsetData.Sum) / float64(accsetData.Count)

@@ -47,8 +47,6 @@ TODOs and Ideas:
 
 - write zipped logfiles (https://gist.github.com/mchirico/6147687)
 - Add a simple webserver which provides configuring intefaces/statistics
-- Understand go dependency management
-- Make the code more modular/structured 
 - Write documentation
 
 DONE:
@@ -64,9 +62,8 @@ DONE:
 - Implement ansynchronous statistics calculation
 - Implement ansynchronous statistics submission to zabbix
 - Implement zabbix discovery
-- Add a logging framework
-  https://godoc.org/github.com/golang/glog
-  https://gobyexample.com/command-line-flags
+- Add a logging framework : https://godoc.org/github.com/golang/glog
+- Use commandline flags: https://gobyexample.com/command-line-flags
 - Parse loglines
 - Calculate statistics
 - Add option parser
